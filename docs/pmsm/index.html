@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>영구자석 동기전동기의 원리 — 2026 10월 고1 학평 국어 [11~14] 시각화</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;background:#060a14;color:#e5e7eb;font-family:"Noto Sans KR","Noto Sans CJK KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif}
+  #wrap{max-width:1600px;margin:0 auto;padding:12px}
+  canvas{width:100%;height:auto;display:block;border-radius:10px;background:#0b1220}
+  #ui{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
+  button{background:#1e293b;color:#e5e7eb;border:1px solid #334155;border-radius:8px;padding:8px 14px;font:inherit;font-size:15px;cursor:pointer}
+  button:hover{background:#273449}
+  button.on{background:#0ea5e9;border-color:#0ea5e9;color:#04121f;font-weight:700}
+  #seek{flex:1;min-width:200px}
+  #time{font-variant-numeric:tabular-nums;font-size:14px;color:#94a3b8;min-width:110px;text-align:right}
+  #chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .render #ui,.render #chips,.render #note{display:none}
+  .render #wrap{padding:0;max-width:none}
+  .render canvas{border-radius:0}
+  #note{font-size:14px;color:#94a3b8;margin-top:10px;line-height:1.6}
+  #note a{color:#38bdf8}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="cv" width="1920" height="1080"></canvas>
+  <div id="ui">
+    <button id="play">▶ 재생</button>
+    <button id="prev">⏮ 이전 장면</button>
+    <button id="next">다음 장면 ⏭</button>
+    <input id="seek" type="range" min="0" max="1000" value="0">
+    <span id="time">0:00 / 0:00</span>
+  </div>
+  <div id="chips"></div>
+  <div id="note">스페이스바: 재생/일시정지 · ←/→: 5초 이동 · 장면 버튼으로 원하는 부분부터 볼 수 있어요. <a href="pmsm.mp4">동영상(MP4) 내려받기</a></div>
+</div>
+<script>
+'use strict';
+const W = 1920, H = 1080;
+const FONT = '"Noto Sans KR","Noto Sans CJK KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif';
+const C = {
+  bg:'#0b1220', panel:'#121b2d', panel2:'#1a2640', line:'#2b3a57', text:'#e5e7eb', sub:'#94a3b8',
+  N:'#ef4444', S:'#3b82f6', field:'#fde047', A:'#fb923c', B:'#4ade80', Cc:'#c084fc',
+  accent:'#38bdf8', stator:'#4b5b74', statorDark:'#3a4860', rotor:'#2a3547', gold:'#fbbf24', good:'#34d399', bad:'#f87171'
+};
+const PH = {A:C.A, B:C.B, C:C.Cc};
+const D2R = Math.PI/180;
+const clamp = (x,a=0,b=1)=>Math.max(a,Math.min(b,x));
+const ease = t=>{t=clamp(t);return t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;};
+const fin = (lt,s,d=0.8)=>ease((lt-s)/d);
+const fout = (lt,s,d=0.8)=>1-ease((lt-s)/d);
+const lerp = (a,b,t)=>a+(b-a)*t;
+const P = (cx,cy,r,deg)=>[cx+r*Math.cos(deg*D2R), cy-r*Math.sin(deg*D2R)];
+const font = (sz,w=500)=>`${w} ${sz}px ${FONT}`;
+
+function txt(ctx,s,x,y,o={}){
+  const {size=28,color=C.text,align='left',base='alphabetic',weight=500,alpha=1}=o;
+  if(alpha<=0) return;
+  ctx.save(); ctx.globalAlpha*=alpha; ctx.font=font(size,weight); ctx.fillStyle=color;
+  ctx.textAlign=align; ctx.textBaseline=base; ctx.fillText(s,x,y); ctx.restore();
+}
+function wrap(ctx,s,maxW){
+  const out=[];
+  for(const para of s.split('\n')){
+    const words=para.split(' '); let line='';
+    for(const w of words){
+      const test=line?line+' '+w:w;
+      if(ctx.measureText(test).width<=maxW){line=test;continue;}
+      if(line) out.push(line);
+      if(ctx.measureText(w).width>maxW){ // break long word by chars
+        let cur='';
+        for(const ch of w){ if(ctx.measureText(cur+ch).width>maxW){out.push(cur);cur=ch;} else cur+=ch; }
+        line=cur;
+      } else line=w;
+    }
+    out.push(line);
+  }
+  return out;
+}
+function para(ctx,s,x,y,maxW,o={}){
+  const {size=26,lh=1.55,color=C.text,weight=400,alpha=1,align='left'}=o;
+  ctx.save(); ctx.font=font(size,weight);
+  const lines=wrap(ctx,s,maxW);
+  ctx.globalAlpha*=alpha; ctx.fillStyle=color; ctx.textAlign=align; ctx.textBaseline='top';
+  lines.forEach((l,i)=>ctx.fillText(l,x,y+i*size*lh));
+  ctx.restore();
+  return lines.length*size*lh;
+}
+function rr(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
+function arrow(ctx,x1,y1,x2,y2,o={}){
+  const {color='#fff',width=4,head=16,alpha=1,dash=null}=o;
+  if(alpha<=0) return;
+  const a=Math.atan2(y2-y1,x2-x1), len=Math.hypot(x2-x1,y2-y1);
+  const hh=Math.min(head,len*0.6);
+  ctx.save(); ctx.globalAlpha*=alpha; ctx.strokeStyle=color; ctx.fillStyle=color; ctx.lineWidth=width; ctx.lineCap='round';
+  if(dash) ctx.setLineDash(dash);
+  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2-Math.cos(a)*hh*0.8,y2-Math.sin(a)*hh*0.8); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.beginPath(); ctx.moveTo(x2,y2);
+  ctx.lineTo(x2-hh*Math.cos(a-0.45),y2-hh*Math.sin(a-0.45));
+  ctx.lineTo(x2-hh*Math.cos(a+0.45),y2-hh*Math.sin(a+0.45)); ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+// arc arrow in math degrees from a1 to a2 (direction follows sign of a2-a1)
+function arcArrow(ctx,cx,cy,r,a1,a2,o={}){
+  const {color='#fff',width=4,head=16,alpha=1}=o;
+  if(alpha<=0) return;
+  ctx.save(); ctx.globalAlpha*=alpha; ctx.strokeStyle=color; ctx.fillStyle=color; ctx.lineWidth=width; ctx.lineCap='round';
+  const dir=Math.sign(a2-a1)||1; const back=(head*0.8/r)/D2R*dir;
+  ctx.beginPath(); ctx.arc(cx,cy,r,-a1*D2R,-(a2-back)*D2R,dir>0); ctx.stroke();
+  const [ex,ey]=P(cx,cy,r,a2); const tang=(a2*D2R)+dir*Math.PI/2; // direction of motion (math)
+  const tx=Math.cos(tang), ty=-Math.sin(tang); const ang=Math.atan2(ty,tx);
+  ctx.beginPath(); ctx.moveTo(ex,ey);
+  ctx.lineTo(ex-head*Math.cos(ang-0.45),ey-head*Math.sin(ang-0.45));
+  ctx.lineTo(ex-head*Math.cos(ang+0.45),ey-head*Math.sin(ang+0.45)); ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+function badge(ctx,x,y,label,color,o={}){
+  const {r=24,alpha=1,dashed=false,size=26,fill=null}=o;
+  if(alpha<=0) return;
+  ctx.save(); ctx.globalAlpha*=alpha;
+  ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2);
+  ctx.fillStyle=fill||color; ctx.fill();
+  if(dashed){ctx.setLineDash([5,4]); ctx.strokeStyle='#fff'; ctx.lineWidth=2.5; ctx.stroke();}
+  ctx.restore();
+  txt(ctx,label,x,y+1,{size,weight:900,align:'center',base:'middle',alpha,color:'#fff'});
+}
+// symbols ⊙ / ⊗
+function curSym(ctx,x,y,r,out,o={}){
+  const {alpha=1,color='#fff',bg='#0b1220'}=o; if(alpha<=0) return;
+  ctx.save(); ctx.globalAlpha*=alpha; ctx.lineWidth=Math.max(2,r*0.16); ctx.strokeStyle=color; ctx.fillStyle=bg;
+  ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle=color;
+  if(out){ ctx.beginPath(); ctx.arc(x,y,r*0.28,0,Math.PI*2); ctx.fill(); }
+  else { const k=r*0.62; ctx.beginPath(); ctx.moveTo(x-k,y-k); ctx.lineTo(x+k,y+k); ctx.moveTo(x+k,y-k); ctx.lineTo(x-k,y+k); ctx.stroke(); }
+  ctx.restore();
+}
+// polyline helper with dash animation
+function poly(ctx,pts,o={}){
+  const {color=C.field,width=2.5,alpha=1,dash=null,offset=0}=o; if(alpha<=0||pts.length<2) return;
+  ctx.save(); ctx.globalAlpha*=alpha; ctx.strokeStyle=color; ctx.lineWidth=width; ctx.lineJoin='round'; ctx.lineCap='round';
+  if(dash){ctx.setLineDash(dash); ctx.lineDashOffset=offset;}
+  ctx.beginPath(); ctx.moveTo(pts[0][0],pts[0][1]); for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i][0],pts[i][1]); ctx.stroke();
+  ctx.restore();
+}
+function headAlong(ctx,pts,frac,o={}){
+  if(pts.length<4) return;
+  const {color=C.field,size=13,alpha=1}=o;
+  let total=0; const seg=[]; for(let i=1;i<pts.length;i++){const d=Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1]); seg.push(d); total+=d;}
+  let target=total*frac, i=0; while(i<seg.length-1&&target>seg[i]){target-=seg[i];i++;}
+  const a=pts[i], b=pts[i+1]; const t=seg[i]?target/seg[i]:0; const x=lerp(a[0],b[0],t), y=lerp(a[1],b[1],t);
+  const ang=Math.atan2(b[1]-a[1],b[0]-a[0]);
+  ctx.save(); ctx.globalAlpha*=alpha; ctx.fillStyle=color; ctx.beginPath();
+  ctx.moveTo(x+size*0.6*Math.cos(ang),y+size*0.6*Math.sin(ang));
+  ctx.lineTo(x-size*0.6*Math.cos(ang)+size*0.5*Math.cos(ang+Math.PI/2),y-size*0.6*Math.sin(ang)+size*0.5*Math.sin(ang+Math.PI/2));
+  ctx.lineTo(x-size*0.6*Math.cos(ang)-size*0.5*Math.cos(ang+Math.PI/2),y-size*0.6*Math.sin(ang)-size*0.5*Math.sin(ang+Math.PI/2));
+  ctx.closePath(); ctx.fill(); ctx.restore();
+}
+function box(ctx,x,y,w,h,o={}){
+  const {fill=C.panel2,stroke=C.line,r=14,alpha=1,lw=2}=o; if(alpha<=0) return;
+  ctx.save(); ctx.globalAlpha*=alpha; rr(ctx,x,y,w,h,r); ctx.fillStyle=fill; ctx.fill(); if(stroke){ctx.strokeStyle=stroke; ctx.lineWidth=lw; ctx.stroke();} ctx.restore();
+}
+
+/* ================= BAR MAGNET FIELD (scene 1) ================= */
+function magnetCharges(m){ // m:{x,y,L,h,dir}  dir=+1 -> N on right
+  return [{x:m.x+m.dir*m.L*0.72,y:m.y,q:1},{x:m.x-m.dir*m.L*0.72,y:m.y,q:-1}];
+}
+function insideS(m,x,y){ // inside body and in S half
+  if(Math.abs(y-m.y)>m.h/2+2||Math.abs(x-m.x)>m.L+2) return false;
+  return (x-m.x)*m.dir<0;
+}
+function traceLines(mags,bounds){
+  const charges=[].concat(...mags.map(magnetCharges));
+  const lines=[];
+  for(const m of mags){
+    const nx=m.x+m.dir*m.L, ny=m.y;
+    const angs=[-150,-128,-108,-90,-72,-55,-38,-20,20,38,55,72,90,108,128,150];
+    for(const a of angs){
+      const ang=(m.dir>0?0:180)+(m.dir>0?a:-a);
+      let x=m.x+m.dir*m.L*0.72+8*Math.cos(ang*D2R), y=ny+8*Math.sin(ang*D2R);
+      const pts=[[x,y]];
+      for(let i=0;i<1600;i++){
+        let ex=0,ey=0;
+        for(const c of charges){const dx=x-c.x,dy=y-c.y; const r2=dx*dx+dy*dy+20; const r3=r2*Math.sqrt(r2); ex+=c.q*dx/r3; ey+=c.q*dy/r3;}
+        const n=Math.hypot(ex,ey)||1; x+=5*ex/n; y+=5*ey/n; pts.push([x,y]);
+        if(x<bounds[0]||x>bounds[2]||y<bounds[1]||y>bounds[3]) break;
+        if(i>4&&charges.some(c=>c.q<0&&Math.hypot(x-c.x,y-c.y)<9)) break;
+      }
+      lines.push(pts);
+    }
+  }
+  return lines;
+}
+function drawBar(ctx,m,o={}){
+  const {alpha=1,glowInner=0}=o; if(alpha<=0) return;
+  ctx.save(); ctx.globalAlpha*=alpha;
+  const x0=m.x-m.L, y0=m.y-m.h/2;
+  ctx.shadowColor='rgba(0,0,0,.5)'; ctx.shadowBlur=18;
+  rr(ctx,x0,y0,m.L*2,m.h,10); ctx.fillStyle='#000'; ctx.fill(); ctx.shadowBlur=0;
+  ctx.save(); rr(ctx,x0,y0,m.L*2,m.h,10); ctx.clip();
+  const nLeft=m.dir<0;
+  ctx.fillStyle=nLeft?C.N:C.S; ctx.fillRect(x0,y0,m.L,m.h);
+  ctx.fillStyle=nLeft?C.S:C.N; ctx.fillRect(m.x,y0,m.L,m.h);
+  ctx.restore();
+  ctx.restore();
+  txt(ctx,nLeft?'N':'S',m.x-m.L*0.6,m.y+2,{size:44,weight:900,align:'center',base:'middle',alpha,color:'#fff'});
+  txt(ctx,nLeft?'S':'N',m.x+m.L*0.6,m.y+2,{size:44,weight:900,align:'center',base:'middle',alpha,color:'#fff'});
+  if(glowInner>0){ // interior arrow S -> N
+    const xs=m.x-m.dir*m.L*0.32, xe=m.x+m.dir*m.L*0.32;
+    arrow(ctx,xs,m.y,xe,m.y,{color:'#fff',width:5,head:18,alpha:alpha*glowInner});
+  }
+}
+function fieldScene(ctx,mags,lt,o={}){
+  const {alpha=1,bounds=[-500,-400,1700,1500]}=o;
+  const lines=traceLines(mags,bounds);
+  for(const pts of lines){
+    poly(ctx,pts,{color:C.field,width:2.4,alpha:alpha*0.85,dash:[16,10],offset:-lt*45});
+    headAlong(ctx,pts,0.42,{alpha,size:15});
+  }
+}
+
+/* ================= MOTOR CROSS-SECTION ================= */
+const SLOTS=[
+  {n:'A',a:90,ph:'A',cap:true},{n:'c',a:30,ph:'C',cap:false},{n:'B',a:-30,ph:'B',cap:true},
+  {n:'a',a:-90,ph:'A',cap:false},{n:'C',a:-150,ph:'C',cap:true},{n:'b',a:150,ph:'B',cap:false}
+];
+const PHDIR={A:0,B:-120,C:120}; // field direction (math deg) at centre for +current
+function currentsAt(theta){ // theta deg ; returns {A,B,C} in units (max 300)
+  return {A:300*Math.sin(theta*D2R), B:300*Math.sin((theta-120)*D2R), C:300*Math.sin((theta+120)*D2R)};
+}
+function resultant(I){
+  let x=0,y=0; for(const k of ['A','B','C']){x+=I[k]*Math.cos(PHDIR[k]*D2R); y+=I[k]*Math.sin(PHDIR[k]*D2R);} return [x,y];
+}
+function slotCurrent(s,I){ const v=I[s.ph]; return s.cap?v:-v; } // >0 means out of stator (⊙)
+
+function drawMotor(ctx,cx,cy,R,o={}){
+  const {rotor=true,rotorAngle=-90,slots='six',I=null,labels=true,alpha=1,hl={},pair=0,em=null,
+         fieldGrid=0,regions=0,statorAlpha=1,rotorAlpha=1,symScale=1,lt=0,slotLabels=true,result=0,wobble=0}=o;
+  const Rin=R*0.64, Rr=R*0.575;
+  ctx.save(); ctx.globalAlpha*=alpha;
+  // stator ring
+  ctx.save(); ctx.globalAlpha*=statorAlpha;
+  ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.arc(cx,cy,Rin,0,Math.PI*2,true);
+  const g=ctx.createRadialGradient(cx,cy,Rin,cx,cy,R); g.addColorStop(0,'#5a6b86'); g.addColorStop(1,'#3a475d');
+  ctx.fillStyle=g; ctx.fill();
+  ctx.lineWidth=2; ctx.strokeStyle='#8091ad'; ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx,cy,Rin,0,Math.PI*2); ctx.stroke();
+  if(hl.stator){ctx.save(); ctx.globalAlpha*=hl.stator; ctx.lineWidth=8; ctx.strokeStyle=C.accent; ctx.shadowColor=C.accent; ctx.shadowBlur=20;
+    ctx.beginPath(); ctx.arc(cx,cy,R+4,0,Math.PI*2); ctx.stroke(); ctx.beginPath(); ctx.arc(cx,cy,Rin-2,0,Math.PI*2); ctx.stroke(); ctx.restore();}
+  // slots
+  if(slots==='many'){
+    for(let i=0;i<36;i++){
+      const a=90-i*10-5;
+      let best=SLOTS[0],bd=999; for(const s of SLOTS){let d=Math.abs(((a-s.a)%360+540)%360-180); if(d<bd){bd=d;best=s;}}
+      ctx.save(); ctx.translate(cx,cy); ctx.rotate(-a*D2R);
+      ctx.fillStyle='#0b1220'; ctx.fillRect(Rin-2,-R*0.022,R*0.11,R*0.044);
+      if(regions>0){ctx.globalAlpha*=regions; ctx.fillStyle=PH[best.ph]; ctx.fillRect(Rin+R*0.015,-R*0.016,R*0.085,R*0.032);}
+      ctx.restore();
+    }
+    if(regions>0){
+      for(const s of SLOTS){
+        ctx.save(); ctx.globalAlpha*=regions*0.28; ctx.fillStyle=PH[s.ph];
+        ctx.beginPath(); ctx.arc(cx,cy,R-3,(-s.a-29)*D2R,(-s.a+29)*D2R); ctx.arc(cx,cy,Rin+R*0.13,(-s.a+29)*D2R,(-s.a-29)*D2R,true); ctx.closePath(); ctx.fill(); ctx.restore();
+        const [lx,ly]=P(cx,cy,R*0.86,s.a);
+        txt(ctx,s.n,lx,ly+2,{size:R*0.12,weight:900,align:'center',base:'middle',alpha:regions,color:'#fff'});
+      }
+    }
+  } else if(slots==='six'){
+    for(const s of SLOTS){
+      const w=R*0.15, d=R*0.15;
+      ctx.save(); ctx.translate(cx,cy); ctx.rotate(-s.a*D2R);
+      rr(ctx,Rin-4,-w/2,d+4,w,6); ctx.fillStyle='#0b1220'; ctx.fill();
+      ctx.lineWidth=2; ctx.strokeStyle=PH[s.ph]; ctx.globalAlpha*=0.9; ctx.stroke();
+      ctx.restore();
+      const [sx,sy]=P(cx,cy,Rin+d*0.52,s.a);
+      if(I){
+        const v=slotCurrent(s,I); const k=Math.abs(v)/300;
+        if(k>0.02) curSym(ctx,sx,sy,R*0.05*symScale*(0.55+0.45*k),v>0,{alpha:0.35+0.65*k,color:'#fff'});
+        else txt(ctx,'0',sx,sy+1,{size:R*0.06,align:'center',base:'middle',color:C.sub});
+      }
+      if(slotLabels&&labels){
+        const [lx,ly]=P(cx,cy,R+R*0.1,s.a);
+        txt(ctx,s.n,lx,ly+2,{size:R*0.11,weight:900,align:'center',base:'middle',color:PH[s.ph]});
+      }
+    }
+  }
+  ctx.restore();
+  // pair lines
+  if(pair>0){
+    for(const ph of ['A','B','C']){
+      const ss=SLOTS.filter(s=>s.ph===ph); const [x1,y1]=P(cx,cy,Rin+R*0.07,ss[0].a), [x2,y2]=P(cx,cy,Rin+R*0.07,ss[1].a);
+      ctx.save(); ctx.globalAlpha*=pair; ctx.strokeStyle=PH[ph]; ctx.lineWidth=4; ctx.setLineDash([12,10]); ctx.lineDashOffset=-lt*30;
+      ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke(); ctx.restore();
+    }
+  }
+  // gap highlight
+  if(hl.gap){ctx.save(); ctx.globalAlpha*=hl.gap; ctx.beginPath(); ctx.arc(cx,cy,Rin,0,Math.PI*2); ctx.arc(cx,cy,Rr,0,Math.PI*2,true); ctx.fillStyle=C.gold; ctx.fill(); ctx.restore();}
+  // field grid (from line currents)
+  if(fieldGrid>0&&I){
+    const wires=SLOTS.map(s=>{const [x,y]=P(cx,cy,Rin+R*0.07,s.a); return {x,y,i:slotCurrent(s,I)};});
+    const step=R*0.16;
+    for(let gx=-Rin;gx<=Rin;gx+=step) for(let gy=-Rin;gy<=Rin;gy+=step){
+      if(Math.hypot(gx,gy)>Rin*0.86) continue;
+      const px=cx+gx, py=cy+gy; let bx=0,by=0; // math coords: y up
+      for(const w of wires){const dx=px-w.x, dy=-(py-w.y); const r2=dx*dx+dy*dy; bx+=w.i*(-dy)/r2; by+=w.i*dx/r2;}
+      const n=Math.hypot(bx,by); if(n<1e-6) continue;
+      const L=step*0.62; const ux=bx/n, uy=-by/n;
+      arrow(ctx,px-ux*L/2,py-uy*L/2,px+ux*L/2,py+uy*L/2,{color:C.field,width:3,head:11,alpha:fieldGrid*0.9});
+    }
+  }
+  // rotor
+  if(rotor){
+    ctx.save(); ctx.globalAlpha*=rotorAlpha;
+    ctx.beginPath(); ctx.arc(cx,cy,Rr,0,Math.PI*2); ctx.fillStyle=C.rotor; ctx.fill(); ctx.lineWidth=2.5; ctx.strokeStyle='#64748b'; ctx.stroke();
+    if(hl.rotor){ctx.save(); ctx.globalAlpha*=hl.rotor; ctx.lineWidth=8; ctx.strokeStyle=C.accent; ctx.shadowColor=C.accent; ctx.shadowBlur=20; ctx.beginPath(); ctx.arc(cx,cy,Rr,0,Math.PI*2); ctx.stroke(); ctx.restore();}
+    ctx.save(); ctx.translate(cx,cy); ctx.rotate(-rotorAngle*D2R);
+    const ml=Rr*0.82, mw=Rr*0.52;
+    rr(ctx,-ml,-mw/2,ml*2,mw,8); ctx.save(); ctx.clip();
+    ctx.fillStyle=C.S; ctx.fillRect(-ml,-mw/2,ml,mw); ctx.fillStyle=C.N; ctx.fillRect(0,-mw/2,ml,mw); ctx.restore();
+    if(hl.magnet){ctx.save(); ctx.globalAlpha*=hl.magnet; ctx.lineWidth=6; ctx.strokeStyle='#fff'; ctx.shadowColor='#fff'; ctx.shadowBlur=16; rr(ctx,-ml,-mw/2,ml*2,mw,8); ctx.stroke(); ctx.restore();}
+    ctx.restore();
+    const [nx,ny]=P(cx,cy,Rr*0.55,rotorAngle), [sx2,sy2]=P(cx,cy,Rr*0.55,rotorAngle+180);
+    txt(ctx,'N',nx,ny+2,{size:Rr*0.26,weight:900,align:'center',base:'middle',color:'#fff'});
+    txt(ctx,'S',sx2,sy2+2,{size:Rr*0.26,weight:900,align:'center',base:'middle',color:'#fff'});
+    // shaft
+    ctx.beginPath(); ctx.arc(cx,cy,Rr*0.15,0,Math.PI*2); ctx.fillStyle='#cbd5e1'; ctx.fill();
+    ctx.beginPath(); ctx.arc(cx,cy,Rr*0.08,0,Math.PI*2); ctx.lineWidth=3; ctx.strokeStyle='#334155'; ctx.stroke();
+    if(hl.shaft){ctx.save(); ctx.globalAlpha*=hl.shaft; ctx.lineWidth=6; ctx.strokeStyle=C.gold; ctx.shadowColor=C.gold; ctx.shadowBlur=16; ctx.beginPath(); ctx.arc(cx,cy,Rr*0.2,0,Math.PI*2); ctx.stroke(); ctx.restore();}
+    ctx.restore();
+  }
+  // resultant big arrow (S -> N of electromagnet)
+  if(result>0&&em){
+    const [x1,y1]=P(cx,cy,Rin*0.8,em.angle+180), [x2,y2]=P(cx,cy,Rin*0.8,em.angle);
+    arrow(ctx,x1,y1,x2,y2,{color:C.field,width:9,head:30,alpha:result*0.75});
+  }
+  // electromagnet ghost poles
+  if(em&&em.alpha>0){
+    const wob=wobble?Math.sin(lt*23)*wobble*14+Math.sin(lt*37)*wobble*9:0;
+    for(const [ang,col,lab] of [[em.angle+wob,C.N,'N'],[em.angle+180+wob,C.S,'S']]){
+      ctx.save(); ctx.globalAlpha*=em.alpha*0.42; ctx.fillStyle=col; ctx.shadowColor=col; ctx.shadowBlur=30;
+      ctx.beginPath(); ctx.arc(cx,cy,Rin+R*0.2,(-ang-32)*D2R,(-ang+32)*D2R); ctx.arc(cx,cy,Rin-3,(-ang+32)*D2R,(-ang-32)*D2R,true); ctx.closePath(); ctx.fill(); ctx.restore();
+      ctx.save(); ctx.globalAlpha*=em.alpha; ctx.setLineDash([8,6]); ctx.strokeStyle=col; ctx.lineWidth=3;
+      ctx.beginPath(); ctx.arc(cx,cy,Rin+R*0.2,(-ang-32)*D2R,(-ang+32)*D2R); ctx.arc(cx,cy,Rin-3,(-ang+32)*D2R,(-ang-32)*D2R,true); ctx.closePath(); ctx.stroke(); ctx.restore();
+      const [bx,by]=P(cx,cy,Rin+R*0.27+R*0.07,ang);
+      badge(ctx,bx,by,lab,col,{r:R*0.075,alpha:em.alpha,dashed:true,size:R*0.085});
+    }
+  }
+  ctx.restore();
+  return {Rin,Rr};
+}
+
+function wheel(ctx,x,y,r,ang,o={}){
+  const {alpha=1,label=true}=o; if(alpha<=0) return;
+  ctx.save(); ctx.globalAlpha*=alpha;
+  ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fillStyle='#111827'; ctx.fill(); ctx.lineWidth=r*0.08; ctx.strokeStyle='#374151'; ctx.stroke();
+  ctx.beginPath(); ctx.arc(x,y,r*0.62,0,Math.PI*2); ctx.fillStyle='#9ca3af'; ctx.fill();
+  ctx.strokeStyle='#4b5563'; ctx.lineWidth=r*0.09;
+  for(let i=0;i<5;i++){const a=ang*D2R+i*Math.PI*2/5; ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+Math.cos(a)*r*0.58,y-Math.sin(a)*r*0.58); ctx.stroke();}
+  ctx.beginPath(); ctx.arc(x,y,r*0.14,0,Math.PI*2); ctx.fillStyle='#e5e7eb'; ctx.fill();
+  ctx.restore();
+  if(label) txt(ctx,'바퀴',x,y+r+30,{size:22,align:'center',alpha,color:C.sub});
+}
+
+/* ================= SCENES ================= */
+const SCENES=[];
+
+// ---------- 0. INTRO ----------
+SCENES.push({
+  title:'영구자석 동기전동기, 지문으로 보는 원리', short:'시작', dur:11, full:true,
+  steps:[[0,'2026학년도 10월 고1 전국연합학력평가 국어 [11~14] 지문을 그림과 움직임으로 따라가 봅시다.']],
+  draw(ctx,lt){
+    const a=fin(lt,0.2,1);
+    txt(ctx,'2026학년도 10월 고1 전국연합학력평가 · 국어 [11~14]',110,270,{size:30,color:C.accent,weight:700,alpha:a});
+    txt(ctx,'영구자석 동기전동기',105,370,{size:92,weight:900,alpha:a});
+    txt(ctx,'전기 자동차를 움직이는 원리, 한 장면씩 보기',110,445,{size:38,color:C.sub,weight:500,alpha:a});
+    const items=['① 자기장의 성질과 자석 사이의 힘','② 영구자석 동기전동기의 구성','③ 전류와 자기장 → 전자석 형성','④ 회전하는 자기장과 회전력 제어','⑤ 고속 주행: 역기전력과 그 제어','⑥ 한눈에 정리 · 문항 연결'];
+    items.forEach((s,i)=>{const al=fin(lt,1.2+i*0.45,0.6); box(ctx,110,520+i*62,640,50,{alpha:al,fill:'#15203a'}); txt(ctx,s,132,555+i*62,{size:28,alpha:al,weight:500});});
+    const th=lt*60; const I=currentsAt(th);
+    drawMotor(ctx,1390,560,330,{rotorAngle:-th,I,em:{angle:90-th,alpha:0.8*fin(lt,1.5)},alpha:fin(lt,0.4,1.2),lt});
+  }
+});
+
+// ---------- 1. MAGNETIC FIELD ----------
+SCENES.push({
+  title:'자기장의 성질과 자석 사이에 작용하는 힘', short:'① 자기장과 자석의 힘', dur:46,
+  quote:'자기력선은, 자석 외부에서는 N극에서 S극으로, 내부에서는 S극에서 N극으로 향하는데, 서로 겹치거나 끊어지지 않는다. 두 자석이 만나면 자기장 사이의 자기장 에너지를 낮춰 안정된 상태를 유지하도록 자기력이 작용한다.',
+  bullets:[[0,'자기장 = 자기력이 작용하고 자기장 에너지가 존재하는 공간'],[8,'자기력선: 외부는 N → S, 내부는 S → N'],[12,'자기력선은 서로 겹치거나 끊어지지 않음'],[18,'자기력은 자기장 에너지를 낮춰 안정되려는 방향으로 작용'],[25,'같은 극: 자기장 에너지 ↑ → 밀어내는 척력'],[35,'다른 극: 자기장이 이어짐 → 당기는 인력']],
+  steps:[[0,'자기장은 자기력이 작용하고, 자기장 에너지가 존재하는 공간이에요. 노란 선(자기력선)은 힘이 작용하는 방향을 보여 줘요.'],
+         [8,'자기력선은 자석 바깥에서는 N극 → S극, 자석 안에서는 S극 → N극으로 향해요. 그리고 서로 겹치거나 끊어지지 않아요.'],
+         [18,'두 자석이 만나면, 두 자기장 사이의 자기장 에너지를 낮춰 ‘안정된 상태’를 유지하려는 방향으로 자기력이 작용해요.'],
+         [25,'같은 극(N–N)끼리 마주하면 두 자기장 사이의 자기장 에너지가 높아져요. 그래서 서로 밀어내는 척력이 생겨요.'],
+         [35,'다른 극(N–S)끼리 마주하면 자기장이 하나로 이어지며 서로 당기는 인력이 생겨요. 이 성질이 전동기의 출발점이에요!']],
+  draw(ctx,lt){
+    const cx=600, cy=540;
+    if(lt<19){
+      const a=fin(lt,0,1)*fout(lt,18,1);
+      const m={x:cx,y:cy,L:170,h:90,dir:1};
+      ctx.save(); ctx.globalAlpha*=a;
+      fieldScene(ctx,[m],lt);
+      drawBar(ctx,m,{glowInner:fin(lt,8,1)});
+      if(lt>8){
+        const b=fin(lt,8.5,0.8);
+        box(ctx,cx-120,cy+75,240,44,{alpha:b,fill:'rgba(15,23,42,.85)'});
+        txt(ctx,'내부: S → N',cx,cy+105,{size:26,align:'center',weight:700,alpha:b});
+        box(ctx,cx-210,190,420,48,{alpha:b,fill:'rgba(15,23,42,.85)'});
+        txt(ctx,'외부: N극에서 나와 S극으로',cx,224,{size:26,align:'center',weight:700,alpha:b,color:C.field});
+      }
+      if(lt>12){const b=fin(lt,12.5,0.8); box(ctx,cx-250,800,500,48,{alpha:b,fill:'rgba(15,23,42,.85)'}); txt(ctx,'자기력선은 겹치거나 끊어지지 않아요',cx,834,{size:26,align:'center',alpha:b,weight:700});}
+      ctx.restore();
+    } else {
+      const nn=lt<34.5;
+      let gap;
+      if(nn) gap=lerp(150,280,ease((lt-26)/3));
+      else gap=lerp(280,70,ease((lt-36)/3.5));
+      const a=fin(lt,19,1)*(nn?fout(lt,34,0.5):fin(lt,34.5,0.6));
+      const m1={x:cx-gap/2-150,y:cy,L:150,h:84,dir:1};
+      const m2={x:cx+gap/2+150,y:cy,L:150,h:84,dir:nn?-1:1};
+      ctx.save(); ctx.globalAlpha*=a;
+      fieldScene(ctx,[m1,m2],lt);
+      drawBar(ctx,m1); drawBar(ctx,m2);
+      // energy meter
+      const show=nn?fin(lt,25,0.8):fin(lt,35,0.8);
+      if(lt>24.5){
+        const level=nn?0.88:0.18, col=nn?C.bad:C.good;
+        box(ctx,330,175,540,90,{alpha:show,fill:'rgba(15,23,42,.9)'});
+        txt(ctx,'두 자석 사이의 자기장 에너지',600,207,{size:24,align:'center',alpha:show,weight:700});
+        box(ctx,360,224,480,24,{alpha:show,fill:'#1f2937',stroke:null,r:12});
+        box(ctx,360,224,480*level*show,24,{alpha:show,fill:col,stroke:null,r:12});
+        txt(ctx,nn?'높음':'낮음',850,244,{size:22,alpha:show,color:col,weight:700});
+        // force arrows
+        const fy=cy+130;
+        if(nn){
+          arrow(ctx,m1.x+40,fy,m1.x-110,fy,{color:C.bad,width:8,head:26,alpha:show});
+          arrow(ctx,m2.x-40,fy,m2.x+110,fy,{color:C.bad,width:8,head:26,alpha:show});
+          box(ctx,cx-125,fy-25,250,52,{alpha:show,fill:'rgba(15,23,42,.92)',stroke:C.bad}); txt(ctx,'척력 (밀어냄)',cx,fy+12,{size:34,weight:900,align:'center',color:C.bad,alpha:show});
+        } else {
+          arrow(ctx,m1.x-90,fy,m1.x+60,fy,{color:C.good,width:8,head:26,alpha:show});
+          arrow(ctx,m2.x+90,fy,m2.x-60,fy,{color:C.good,width:8,head:26,alpha:show});
+          box(ctx,cx-110,fy+22,220,52,{alpha:show,fill:'rgba(15,23,42,.92)',stroke:C.good}); txt(ctx,'인력 (당김)',cx,fy+60,{size:34,weight:900,align:'center',color:C.good,alpha:show});
+        }
+      }
+      ctx.restore();
+    }
+  }
+});
+
+// ---------- 2. STRUCTURE ----------
+function cylinder3D(ctx,lt,alpha){
+  if(alpha<=0) return;
+  ctx.save(); ctx.globalAlpha*=alpha;
+  const xb=330, xf=880, cy=520, rx=95, ry=260, k=0.64;
+  const E=(x,r,phi)=>[x+rx*r*Math.cos(phi*D2R), cy-ry*r*Math.sin(phi*D2R)];
+  // body silhouette
+  ctx.fillStyle='rgba(75,91,116,.35)'; ctx.beginPath(); ctx.moveTo(xb,cy-ry); ctx.lineTo(xf,cy-ry); ctx.ellipse(xf,cy,rx,ry,0,-Math.PI/2,Math.PI/2); ctx.lineTo(xb,cy+ry); ctx.ellipse(xb,cy,rx,ry,0,Math.PI/2,-Math.PI/2); ctx.fill();
+  ctx.strokeStyle='#8091ad'; ctx.lineWidth=2.5;
+  ctx.beginPath(); ctx.ellipse(xb,cy,rx,ry,0,0,Math.PI*2); ctx.stroke();
+  ctx.beginPath(); ctx.ellipse(xb,cy,rx*k,ry*k,0,0,Math.PI*2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(xb,cy-ry); ctx.lineTo(xf,cy-ry); ctx.moveTo(xb,cy+ry); ctx.lineTo(xf,cy+ry); ctx.stroke();
+  // slots along inner surface
+  for(let i=0;i<24;i++){
+    const phi=i*15; const p1=E(xb,k,phi), p2=E(xf,k,phi);
+    const hi=(phi===90||phi===270);
+    poly(ctx,[p1,p2],{color:hi?C.A:'#94a3b8',width:hi?5:1.6,alpha:hi?1:0.45});
+  }
+  // front face ring
+  ctx.beginPath(); ctx.ellipse(xf,cy,rx,ry,0,0,Math.PI*2); ctx.ellipse(xf,cy,rx*k,ry*k,0,0,Math.PI*2,true); ctx.fillStyle='rgba(90,107,134,.85)'; ctx.fill('evenodd');
+  ctx.beginPath(); ctx.ellipse(xf,cy,rx,ry,0,0,Math.PI*2); ctx.stroke(); ctx.beginPath(); ctx.ellipse(xf,cy,rx*k,ry*k,0,0,Math.PI*2); ctx.stroke();
+  // wire path: in at front top slot -> back -> around back face -> bottom slot -> out front
+  const top1=E(xf,k,90), top0=E(xb,k,90), bot0=E(xb,k,270), bot1=E(xf,k,270);
+  const path=[[top1[0]+90,top1[1]-40],top1,top0];
+  for(let p=90;p<=270;p+=6){path.push(E(xb-0,k*1.0,p).map((v,j)=>j===0?v-rx*0.55*Math.sin((p-90)*D2R/2*2)*0.0-30*Math.sin((p-90)*D2R):v));}
+  path.push(bot0,bot1,[bot1[0]+90,bot1[1]+40]);
+  poly(ctx,path,{color:C.A,width:6,alpha:0.95});
+  poly(ctx,path,{color:'#fff',width:6,alpha:0.9,dash:[3,34],offset:-lt*60});
+  headAlong(ctx,path,0.12,{color:C.A,size:24}); headAlong(ctx,path,0.92,{color:C.A,size:24});
+  txt(ctx,'전선이 들어감',top1[0]+100,top1[1]-48,{size:24,weight:700,color:C.A});
+  txt(ctx,'마주 보는 슬롯으로 나옴',bot1[0]+100,bot1[1]+64,{size:24,weight:700,color:C.A});
+  txt(ctx,'한쪽 밑면',xb-20,cy-ry-24,{size:24,align:'center',color:C.sub});
+  txt(ctx,'다른 쪽 밑면',xf,cy-ry-24,{size:24,align:'center',color:C.sub});
+  txt(ctx,'슬롯 (밑면에서 밑면까지 이어진 홈)',(xb+xf)/2,cy+ry+52,{size:26,align:'center',weight:700});
+  ctx.restore();
+}
+SCENES.push({
+  title:'영구자석 동기전동기의 원리와 구성', short:'② 전동기의 구성', dur:52,
+  quote:'전동기에는 영구자석이 부착된 원형의 회전자가 자동차 바퀴와 연결된 중심축에 결합되어 있고, 회전자 바깥쪽에 약간의 틈을 두고 이를 감싸는 원통형의 고정자가 배치되어 있다.',
+  bullets:[[0,'영구자석과 전자석 사이의 인력·척력 이용 → 전기 에너지를 회전력으로'],[8,'회전자: 영구자석 부착, 바퀴와 연결된 중심축에 결합'],[18,'고정자: 약간의 틈을 두고 회전자를 감싸는 원통'],[27,'고정자 안쪽: 수십 개의 슬롯이 일정한 간격으로'],[37,'슬롯 6구역 → 마주 보는 구역끼리 한 쌍, 하나의 전선 다발'],[45,'제어 시스템: 전자석 형성 + 회전력 제어를 유기적으로 연결']],
+  steps:[[0,'영구자석 동기전동기는 영구자석과, 전류가 흐를 때만 자성을 띠는 전자석 사이의 인력과 척력으로 전기 에너지를 회전력으로 바꾸는 전기 자동차의 핵심 장치예요.'],
+         [8,'가운데의 원형 회전자에는 영구자석이 붙어 있어요. 회전자는 자동차 바퀴와 연결된 중심축에 결합되어 있어서, 회전자가 돌면 바퀴도 돌아요.'],
+         [18,'회전자 바깥쪽에는 약간의 틈을 두고, 회전자를 감싸는 원통형 고정자가 있어요. 고정자는 움직이지 않아요.'],
+         [27,'고정자 안쪽에는 원통의 한쪽 밑면에서 다른 쪽 밑면까지 이어진 수십 개의 슬롯이 일정한 간격으로 파여 있어요. 한 슬롯으로 들어간 전선은 마주 보는 슬롯으로 나와요.'],
+         [37,'슬롯을 여섯 구역으로 나누고, 마주 보는 구역끼리(A–a, B–b, C–c) 짝지어 하나의 전선 다발로 감아요. 그래서 모두 세 쌍이 생겨요.'],
+         [45,'이 구조를 바탕으로 제어 시스템은 ‘전자석 형성 과정’과 ‘회전력 제어 과정’을 유기적으로 연결하여 전동기를 구동해요.']],
+  draw(ctx,lt){
+    const cx=560, cy=520, R=300;
+    const crossA=(lt<27.5?1:fout(lt,27.5,0.8))+(lt>36?fin(lt,36,0.8):0);
+    const cylA=lt>27.5&&lt<37?fin(lt,28,0.8)*fout(lt,36,0.6):0;
+    const rot=-90+(lt>8&&lt<18?(lt-8)*25:(lt>=18?250:0));
+    const many=lt<45.5;
+    drawMotor(ctx,cx,cy,R,{alpha:crossA,rotorAngle:rot,slots:many?'many':'six',regions:lt>37?fin(lt,37.5,1):0,pair:0,lt,
+      hl:{rotor:lt>8&&lt<18?0.6+0.4*Math.sin(lt*4):0, shaft:lt>11&&lt<18?1:0, magnet:lt>8&&lt<12?0.8:0, stator:lt>18&&lt<27?0.6+0.4*Math.sin(lt*4):0, gap:lt>21&&lt<27?0.75:0},
+      slotLabels:!many, statorAlpha:1});
+    if(crossA>0.01){
+      ctx.save(); ctx.globalAlpha*=crossA;
+      if(lt<8){const b=fin(lt,1,1); box(ctx,170,170,780,56,{alpha:b,fill:'rgba(15,23,42,.9)'}); txt(ctx,'전기 에너지  →  인력·척력  →  회전력',560,208,{size:30,align:'center',weight:700,alpha:b,color:C.gold});}
+      if(lt>8&&lt<18){
+        const b=fin(lt,8.5,0.8);
+        arrow(ctx,860,330,cx+90,cy-60,{color:C.accent,width:4,head:16,alpha:b}); txt(ctx,'회전자 + 영구자석',870,320,{size:28,weight:700,alpha:b,color:C.accent});
+        const b2=fin(lt,11,0.8);
+        wheel(ctx,1000,780,80,-(lt-8)*25,{alpha:b2});
+        ctx.save(); ctx.globalAlpha*=b2; ctx.setLineDash([10,8]); ctx.strokeStyle=C.gold; ctx.lineWidth=4; ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(1000,780); ctx.stroke(); ctx.restore();
+        txt(ctx,'중심축 (바퀴와 연결)',870,690,{size:26,weight:700,color:C.gold,alpha:b2});
+      }
+      if(lt>18&&lt<27.5){
+        const b=fin(lt,18.5,0.8);
+        arrow(ctx,960,250,cx+200,cy-200,{color:C.accent,width:4,head:16,alpha:b}); txt(ctx,'고정자 (원통형)',930,235,{size:28,weight:700,alpha:b,color:C.accent});
+        const b2=fin(lt,21.5,0.8);
+        arrow(ctx,980,700,cx+R*0.5,cy+R*0.38,{color:C.gold,width:4,head:16,alpha:b2}); txt(ctx,'약간의 틈',960,730,{size:28,weight:700,alpha:b2,color:C.gold});
+      }
+      if(lt>45){
+        const b=fin(lt,45.5,0.8);
+        box(ctx,915,330,230,80,{alpha:b,fill:'#1d2c4a',stroke:C.accent});
+        txt(ctx,'전자석 형성 과정',1030,380,{size:25,align:'center',weight:700,alpha:b});
+        box(ctx,915,560,230,80,{alpha:b,fill:'#1d2c4a',stroke:C.accent});
+        txt(ctx,'회전력 제어 과정',1030,610,{size:25,align:'center',weight:700,alpha:b});
+        arcArrow(ctx,1030,485,95,60,-60,{color:C.gold,width:4,alpha:b}); arcArrow(ctx,1030,485,95,-120,-240,{color:C.gold,width:4,alpha:b});
+        txt(ctx,'유기적 연결',1030,494,{size:22,align:'center',color:C.gold,weight:700,alpha:b});
+      }
+      if(lt>37&&lt<45.5){const b=fin(lt,38,0.8)*fout(lt,45,0.5); txt(ctx,'같은 색 = 한 쌍 (하나의 전선 다발)',560,880,{size:26,align:'center',weight:700,alpha:b});
+        box(ctx,915,380,230,230,{alpha:b,fill:'#15203a'});
+        txt(ctx,'세 쌍의 구역',1030,425,{size:24,weight:700,align:'center',alpha:b});
+        [['A','a',C.A],['B','b',C.B],['C','c',C.Cc]].forEach(([u,l,col],k)=>{const y=480+k*50; const bb=b*fin(lt,40+k*1.2,0.6);
+          txt(ctx,u,965,y,{size:30,weight:900,color:col,alpha:bb,align:'center'}); arrow(ctx,990,y-10,1060,y-10,{color:col,width:4,head:12,alpha:bb}); arrow(ctx,1060,y-10,990,y-10,{color:col,width:4,head:12,alpha:bb}); txt(ctx,l,1090,y,{size:30,weight:900,color:col,alpha:bb,align:'center'});});}
+      ctx.restore();
+    }
+    cylinder3D(ctx,lt,cylA);
+  }
+});
+
+// ---------- 3. ELECTROMAGNET ----------
+function wire3D(ctx,cx,cy,lt,alpha){
+  if(alpha<=0) return;
+  ctx.save(); ctx.globalAlpha*=alpha;
+  const top=cy-250, bot=cy+250, rw=16;
+  const rings=[cy-120,cy,cy+120];
+  // back halves
+  for(const ry of rings){ctx.beginPath(); ctx.ellipse(cx,ry,120,36,0,Math.PI,Math.PI*2); ctx.strokeStyle=C.field; ctx.globalAlpha=alpha*0.5; ctx.lineWidth=4; ctx.stroke();}
+  ctx.globalAlpha=alpha;
+  // wire
+  const g=ctx.createLinearGradient(cx-rw,0,cx+rw,0); g.addColorStop(0,'#b45309'); g.addColorStop(0.5,'#fbbf24'); g.addColorStop(1,'#92400e');
+  ctx.fillStyle=g; ctx.fillRect(cx-rw,top,rw*2,bot-top);
+  arrow(ctx,cx,bot-30,cx,top+10,{color:'#fff',width:6,head:24});
+  txt(ctx,'전류 I',cx+30,top+20,{size:30,weight:900});
+  // front halves with arrowheads (CCW seen from top => front moves to the right)
+  for(const ry of rings){
+    ctx.beginPath(); ctx.ellipse(cx,ry,120,36,0,0,Math.PI); ctx.strokeStyle=C.field; ctx.lineWidth=4; ctx.stroke();
+    const ph=(lt*1.2)%1; const ang=Math.PI*(0.15+0.7*ph); // moving along front from right(0) to left(pi)?
+    // front of ellipse: angle 0 (right) .. PI (left) in canvas param; CCW from top means front moves left->right => param decreasing
+    const t=Math.PI*(0.85-0.7*ph);
+    const x=cx+120*Math.cos(t), y=ry+36*Math.sin(t);
+    const dx=120*Math.sin(t), dy=-36*Math.cos(t); const a=Math.atan2(dy,dx);
+    ctx.fillStyle=C.field; ctx.beginPath(); ctx.moveTo(x+14*Math.cos(a),y+14*Math.sin(a)); ctx.lineTo(x-10*Math.cos(a)+9*Math.cos(a+Math.PI/2),y-10*Math.sin(a)+9*Math.sin(a+Math.PI/2)); ctx.lineTo(x-10*Math.cos(a)-9*Math.cos(a+Math.PI/2),y-10*Math.sin(a)-9*Math.sin(a+Math.PI/2)); ctx.closePath(); ctx.fill();
+  }
+  txt(ctx,'자기장 B',cx+140,cy+8,{size:28,weight:700,color:C.field});
+  ctx.restore();
+}
+function ringField(ctx,x,y,out,lt,alpha,{rmax=110,n=3}={}){
+  if(alpha<=0) return;
+  for(let i=1;i<=n;i++){
+    const r=rmax*i/n; const dir=out?1:-1; // out -> CCW (math positive)
+    const base=(lt*60*dir)+i*40;
+    for(let k=0;k<3;k++){
+      const a1=base+k*120, a2=a1+dir*80;
+      arcArrow(ctx,x,y,r,a1,a2,{color:C.field,width:3,head:12,alpha:alpha*(1-0.15*i)});
+    }
+  }
+  curSym(ctx,x,y,22,out,{color:'#fff'});
+}
+SCENES.push({
+  title:'전류와 자기장의 상호 작용 → 전자석 형성', short:'③ 전자석 형성', dur:56,
+  quote:'전선 다발을 따라 전류가 고정자에서 밖으로 나오는 구역의 자기장은 반시계 방향으로, 전류가 고정자의 안으로 들어가는 구역의 자기장은 시계 방향으로 형성된다. … 자기장이 나가는 방향은 N극, 들어오는 방향은 S극을 띠는 전자석이 만들어진다.',
+  bullets:[[0,'가속 신호 → 제어 시스템이 배터리 전류를 특정 구역의 전선 다발로'],[9,'오른나사 법칙: 엄지 = 전류, 네 손가락 = 자기장 방향'],[19,'⊙ 고정자에서 밖으로 나오는 구역: 반시계 방향 자기장'],[23,'⊗ 고정자 안으로 들어가는 구역: 시계 방향 자기장'],[31,'방향이 반대인 두 자기장이 고정자 표면에서 마주함'],[42,'나가는 방향 = N극, 들어오는 방향 = S극 → 눈에 보이지 않는 전자석']],
+  steps:[[0,'자동차가 가속 신호를 받으면, 제어 시스템이 배터리의 전류를 고정자의 특정 구역 전선 다발에 흘려보내요.'],
+         [9,'오른나사 법칙: 오른손 엄지를 전류 방향에 맞추면, 나머지 네 손가락이 감기는 방향이 자기장의 방향이 돼요.'],
+         [19,'그래서 전류가 고정자에서 밖으로 나오는(⊙) 구역의 자기장은 반시계 방향, 고정자 안으로 들어가는(⊗) 구역의 자기장은 시계 방향으로 생겨요.'],
+         [31,'A 구역(⊙)과 a 구역(⊗)처럼 방향이 반대인 두 자기장이 고정자 표면에서 마주하면, 그 사이에는 한쪽으로 향하는 자기장이 만들어져요.'],
+         [42,'자기장이 나가는 방향은 N극, 들어오는 방향은 S극! 회전자 쪽 고정자 표면에 눈에 보이지 않는 ‘전자석’이 생겨요.']],
+  draw(ctx,lt){
+    if(lt<9.5){
+      const a=fin(lt,0,0.8)*fout(lt,9,0.5);
+      const labels=['가속 신호','제어 시스템','배터리 전류','특정 구역 전선 다발'];
+      const xs=[45,320,595,870], y=330, w=215, h=90;
+      labels.forEach((s,i)=>{
+        const b=a*fin(lt,0.3+i*0.9,0.6);
+        box(ctx,xs[i],y,w,h,{alpha:b,fill:i===1?'#1d3557':'#1a2640',stroke:i===3?C.A:C.accent});
+        txt(ctx,s,xs[i]+w/2,y+h/2+2,{size:i===3?22:28,weight:700,align:'center',base:'middle',alpha:b});
+        if(i<3){const b2=a*fin(lt,0.8+i*0.9,0.5); arrow(ctx,xs[i]+w+4,y+h/2,xs[i+1]-6,y+h/2,{color:C.gold,width:5,head:16,alpha:b2});
+          const ph=((lt*0.9)-i*0.3)%1; if(ph>0) { ctx.save(); ctx.globalAlpha*=b2; ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(lerp(xs[i]+w+4,xs[i+1]-6,ph),y+h/2,6,0,Math.PI*2); ctx.fill(); ctx.restore(); }}
+      });
+      const b=a*fin(lt,3.8,0.8);
+      drawMotor(ctx,600,700,170,{alpha:b,rotor:false,I:{A:300*fin(lt,4.5,1.2),B:0,C:0},lt,slotLabels:true});
+      txt(ctx,'A–a 구역에 전류 공급',830,710,{size:28,weight:700,color:C.A,alpha:b});
+      return;
+    }
+    if(lt<19.5){
+      const a=fin(lt,9.5,0.8)*fout(lt,19,0.5);
+      wire3D(ctx,420,520,lt,a);
+      // hand-rule legend
+      box(ctx,700,300,420,250,{alpha:a,fill:'#15203a'});
+      txt(ctx,'오른나사 법칙',910,350,{size:32,weight:900,align:'center',alpha:a,color:C.gold});
+      txt(ctx,'엄지 손가락',740,410,{size:26,weight:700,alpha:a}); txt(ctx,'→ 전류 방향',920,410,{size:26,alpha:a});
+      txt(ctx,'네 손가락',740,460,{size:26,weight:700,alpha:a,color:C.field}); txt(ctx,'→ 자기장 방향',920,460,{size:26,alpha:a,color:C.field});
+      txt(ctx,'(감아쥐는 방향)',740,505,{size:22,alpha:a,color:C.sub});
+      const b=a*fin(lt,13,0.8);
+      txt(ctx,'위에서 내려다보면 (전류가 나를 향해 나옴)',910,610,{size:22,align:'center',alpha:b,color:C.sub});
+      ctx.save(); ctx.globalAlpha*=b; ringField(ctx,910,730,true,lt,1,{rmax:95,n:2}); ctx.restore();
+      txt(ctx,'반시계 방향',910,860,{size:26,weight:700,align:'center',alpha:b,color:C.field});
+      return;
+    }
+    if(lt<31.5){
+      const a=fin(lt,19.5,0.8)*fout(lt,31,0.5);
+      ctx.save(); ctx.globalAlpha*=a;
+      ringField(ctx,340,500,true,lt,1,{rmax:150,n:3});
+      const b=fin(lt,23,0.8);
+      ctx.save(); ctx.globalAlpha*=b; ringField(ctx,860,500,false,lt,1,{rmax:150,n:3}); ctx.restore();
+      box(ctx,150,700,380,110,{fill:'#15203a'});
+      txt(ctx,'⊙ 고정자에서 밖으로 나옴',340,745,{size:26,weight:700,align:'center'});
+      txt(ctx,'→ 반시계 방향 자기장',340,785,{size:26,align:'center',color:C.field});
+      box(ctx,670,700,380,110,{fill:'#15203a',alpha:b});
+      txt(ctx,'⊗ 고정자 안으로 들어감',860,745,{size:26,weight:700,align:'center',alpha:b});
+      txt(ctx,'→ 시계 방향 자기장',860,785,{size:26,align:'center',color:C.field,alpha:b});
+      ctx.restore();
+      return;
+    }
+    const a=fin(lt,31.5,0.8);
+    const cx=520, cy=520, R=330, Rin=R*0.64;
+    const I={A:300,B:0,C:0};
+    const em=lt>42?{angle:0,alpha:fin(lt,42.5,1)}:null;
+    drawMotor(ctx,cx,cy,R,{alpha:a,rotor:false,I,lt,fieldGrid:fin(lt,35,1.5),em,slotLabels:true});
+    // local swirl circles around A and a
+    const sw=a*fin(lt,32,0.8)*fout(lt,40,1.5);
+    const [ax,ay]=P(cx,cy,Rin+R*0.07,90), [bx,by]=P(cx,cy,Rin+R*0.07,-90);
+    for(const [x,y,out] of [[ax,ay,true],[bx,by,false]]){
+      for(let i=1;i<=2;i++){const dir=out?1:-1; for(let k=0;k<3;k++){const a1=lt*60*dir+k*120+i*30; arcArrow(ctx,x,y,32*i+12,a1,a1+dir*70,{color:C.field,width:3,head:10,alpha:sw});}}
+    }
+    if(lt>35&&lt<42){const b=fin(lt,35.5,0.8); box(ctx,cx-250,cy-30,500,54,{alpha:b,fill:'rgba(15,23,42,.9)'}); txt(ctx,'두 자기장이 만나 한 방향(→)으로!',cx,cy+8,{size:30,weight:900,align:'center',alpha:b,color:'#fff'});}
+    if(lt>42){
+      const b=fin(lt,43,0.8);
+      box(ctx,895,400,250,150,{alpha:b,fill:'#15203a'});
+      txt(ctx,'점선 = 전자석',1020,445,{size:24,weight:700,align:'center',alpha:b});
+      txt(ctx,'나가는 쪽 → N극',1020,488,{size:24,align:'center',alpha:b,color:C.N,weight:700});
+      txt(ctx,'들어오는 쪽 → S극',1020,528,{size:24,align:'center',alpha:b,color:C.S,weight:700});
+      box(ctx,cx-200,cy-30,400,54,{alpha:b,fill:'rgba(15,23,42,.9)'}); txt(ctx,'눈에 보이지 않는 전자석',cx,cy+8,{size:30,weight:900,align:'center',alpha:b,color:'#fff'});
+    }
+  }
+});
+
+// ---------- 4. ROTATING FIELD ----------
+function theta4(lt){
+  if(lt<24) return 0;
+  if(lt<28) return 90*ease((lt-24)/4);
+  if(lt<32) return 90;
+  if(lt<44) return 90+270*ease((lt-32)/12);
+  return 360+(lt-44)*80;
+}
+function graph3(ctx,x0,y0,w,h,theta,o={}){
+  const {alpha=1,dcMorph=1,bProg=1,cProg=1,cursor=true}=o; if(alpha<=0) return;
+  ctx.save(); ctx.globalAlpha*=alpha;
+  box(ctx,x0-70,y0-h/2-60,w+110,h+150,{fill:'#111a2c'});
+  const sy=(h/2)/300; const X=t=>x0+w*t/360, Y=v=>y0-v*sy;
+  ctx.strokeStyle='#334155'; ctx.lineWidth=1.5; ctx.setLineDash([5,5]);
+  for(const v of [-300,-150,150,300]){ctx.beginPath(); ctx.moveTo(x0,Y(v)); ctx.lineTo(x0+w,Y(v)); ctx.stroke(); txt(ctx,String(v),x0-12,Y(v)+7,{size:18,align:'right',color:C.sub});}
+  for(const t of [90,180,270,360]){ctx.beginPath(); ctx.moveTo(X(t),Y(300)); ctx.lineTo(X(t),Y(-300)); ctx.stroke();}
+  ctx.setLineDash([]); ctx.strokeStyle='#cbd5e1'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(x0,Y(0)); ctx.lineTo(x0+w+10,Y(0)); ctx.moveTo(x0,Y(320)); ctx.lineTo(x0,Y(-320)); ctx.stroke();
+  txt(ctx,'0',x0-12,Y(0)+7,{size:18,align:'right',color:C.sub});
+  ['t₀','t₁','t₂','t₃','t₄'].forEach((s,i)=>txt(ctx,s,X(i*90),Y(-300)+34,{size:24,align:'center',weight:700}));
+  txt(ctx,'전류의 세기(I)',x0-50,y0-h/2-25,{size:20,color:C.sub});
+  txt(ctx,'시간',x0+w+18,Y(0)+6,{size:20,color:C.sub});
+  const curve=(fn,col,dash,prog)=>{ if(prog<=0) return; ctx.save(); ctx.strokeStyle=col; ctx.lineWidth=4; if(dash) ctx.setLineDash(dash); ctx.beginPath();
+    for(let t=0;t<=360*prog;t+=2){const v=fn(t); t?ctx.lineTo(X(t),Y(v)):ctx.moveTo(X(t),Y(v));} ctx.stroke(); ctx.restore(); };
+  curve(t=>lerp(220,currentsAt(t).A,dcMorph),C.A,null,1);
+  if(dcMorph<0.6) txt(ctx,'직류 (배터리)',X(250),Y(220)-14,{size:22,color:C.A,weight:700,alpha:1-dcMorph/0.6});
+  curve(t=>currentsAt(t).B,C.B,[14,9],bProg);
+  curve(t=>currentsAt(t).C,C.Cc,[4,7],cProg);
+  // legend
+  const ly=Y(-300)+72;
+  [['A–a 쌍',C.A,null],['B–b 쌍',C.B,[14,9]],['C–c 쌍',C.Cc,[4,7]]].forEach(([s,col,d],i)=>{
+    const lx=x0-30+i*140; ctx.save(); ctx.strokeStyle=col; ctx.lineWidth=4; if(d) ctx.setLineDash(d); ctx.beginPath(); ctx.moveTo(lx,ly); ctx.lineTo(lx+40,ly); ctx.stroke(); ctx.restore();
+    txt(ctx,s,lx+48,ly+7,{size:20,color:col,weight:700});
+  });
+  if(cursor){
+    const t=((theta%360)+360)%360; const tt=(theta>=360&&t<0.01)?360:t;
+    ctx.strokeStyle='#fff'; ctx.lineWidth=2.5; ctx.beginPath(); ctx.moveTo(X(tt),Y(320)); ctx.lineTo(X(tt),Y(-320)); ctx.stroke();
+    const I=currentsAt(tt);
+    for(const [k,col] of [['A',C.A],['B',C.B],['C',C.Cc]]){ctx.beginPath(); ctx.arc(X(tt),Y(I[k]),8,0,Math.PI*2); ctx.fillStyle=col; ctx.fill(); ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke();}
+  }
+  ctx.restore();
+}
+function phasor(ctx,cx,cy,I,o={}){
+  const {alpha=1,scale=0.24}=o; if(alpha<=0) return;
+  ctx.save(); ctx.globalAlpha*=alpha;
+  box(ctx,cx-250,cy-150,500,300,{fill:'#111a2c'});
+  txt(ctx,'세 구역 자기장의 합',cx-230,cy-112,{size:22,weight:700,color:C.sub});
+  const ox=cx+40, oy=cy+10;
+  ctx.setLineDash([6,6]); ctx.strokeStyle='#475569'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(ox,oy,450*scale,0,Math.PI*2); ctx.stroke(); ctx.setLineDash([]);
+  let x=ox,y=oy;
+  for(const k of ['A','B','C']){const v=I[k]; const dx=v*Math.cos(PHDIR[k]*D2R)*scale, dy=-v*Math.sin(PHDIR[k]*D2R)*scale;
+    if(Math.hypot(dx,dy)>3) arrow(ctx,x,y,x+dx,y+dy,{color:PH[k],width:5,head:14}); x+=dx; y+=dy;}
+  arrow(ctx,ox,oy,x,y,{color:'#fff',width:7,head:20});
+  const [rx,ry]=resultant(I); const mag=Math.hypot(rx,ry);
+  txt(ctx,'합성 세기',cx-230,cy+60,{size:22,color:C.sub});
+  txt(ctx,String(Math.round(mag)),cx-230,cy+100,{size:36,weight:900});
+  txt(ctx,'→ 항상 일정!',cx-150,cy+100,{size:22,weight:700,color:C.good});
+  ctx.restore();
+}
+SCENES.push({
+  title:'회전하는 자기장의 형성과 바퀴의 회전력 제어', short:'④ 회전 자기장과 회전력', dur:76,
+  quote:'일정한 주기로 각 구역에 형성된 자기장들의 방향과 세기가 순차적으로 변하면서 마치 하나의 전자석이 회전하는 것과 같은 효과가 나타난다.',
+  bullets:[[0,'배터리의 직류 → 방향·세기가 주기적으로 변하는 교류'],[9,'세 쌍의 구역에 각각 시간차를 두고 공급'],[18,'전류 방향이 바뀌면 자기장 방향도 반대로'],[24,'한 구역이 최대일 때 나머지 둘은 각각 절반 → 전체 세기 일정'],[32,'방향·세기가 차례로 변함 → 전자석이 회전하는 효과'],[45,'영구자석 N극의 90° 앞: 전자석 S극 → 인력(당김)'],[57,'뒤쪽: 전자석 N극 → 척력(밀어냄) → 바퀴에 최대 동력']],
+  steps:[[0,'회전력 제어 과정: 제어 시스템은 배터리의 직류를, 전류의 방향과 세기가 주기적으로 변하는 교류로 바꿔요.'],
+         [9,'이 교류를 고정자의 세 쌍의 구역(A–a, B–b, C–c)에 각각 시간차를 두고 공급해요. 그래프의 세 곡선이 서로 어긋나 있는 이유예요.'],
+         [18,'t₀일 때 A–a 구역의 전류는 0이에요. 이때 전자석은 B–b와 C–c 구역에서 만들어진 자기장만으로 형성돼요. (전류 방향이 바뀌면 자기장 방향도 반대!)'],
+         [24,'t₁: A–a 구역의 전류가 가장 셀 때(300), B–b와 C–c는 각각 그 절반(150)이에요. 전류의 세기는 자기장 세기에 비례하니까, 전체 전자석의 세기가 일정하게 유지돼요.'],
+         [32,'이렇게 각 구역 자기장의 방향과 세기가 차례로 변하면, 마치 하나의 전자석이 빙글빙글 회전하는 것 같은 효과가 나타나요. t₄에서 회전자는 t₀ 위치로 돌아와요.'],
+         [45,'회전력을 가장 효율적으로 얻기 위해, 제어 시스템은 영구자석 N극의 위치를 계산해서 N극이 도는 방향으로 90° 앞선 곳에 전자석의 S극을 만들어 당겨요(인력).'],
+         [57,'동시에 뒤쪽에는 전자석의 N극을 만들어 영구자석을 밀어내요(척력). 당기고 미는 힘이 함께 작용해서 바퀴에 최대한의 동력이 전달돼요.'],
+         [67,'정리: 전류(교류) 변화 → 전자석 회전 → 영구자석이 따라 회전 → 중심축과 연결된 바퀴 회전!']],
+  draw(ctx,lt){
+    const cx=345, cy=500, R=255;
+    const th=theta4(lt);
+    const I=lt<9?{A:0,B:0,C:0}:currentsAt(th);
+    const showI=lt>=9;
+    const em={angle:90-th,alpha:lt>18?fin(lt,18.5,1):0};
+    drawMotor(ctx,cx,cy,R,{rotorAngle:-th,I:showI?I:null,em,lt,result:lt>18&&lt<45?0.9*fin(lt,19,1):0});
+    // time label on motor
+    const tl=[[0,'t₀'],[90,'t₁'],[180,'t₂'],[270,'t₃'],[360,'t₄']].find(([d])=>Math.abs(th-d)<1.5);
+    if(tl&&lt>18&&lt<44) badge(ctx,cx-R-10,cy-R+10,tl[1],'#0ea5e9',{r:36,size:30});
+    // attraction / repulsion
+    if(lt>45){
+      const b=fin(lt,45.5,0.8), b2=fin(lt,57,0.8);
+      const rot=-th, Rr=R*0.575, Rin=R*0.64;
+      const [nx,ny]=P(cx,cy,Rr*0.78,rot);
+      const [sx,sy]=P(cx,cy,Rin*0.98,rot-62);
+      arrow(ctx,nx,ny,sx,sy,{color:C.good,width:7,head:22,alpha:b});
+      const [ex,ey]=P(cx,cy,Rin*0.98,rot+62);
+      arrow(ctx,ex,ey,nx,ny,{color:C.bad,width:7,head:22,alpha:b2});
+      // angle marker
+      ctx.save(); ctx.globalAlpha*=b; ctx.strokeStyle='#fff'; ctx.lineWidth=2.5; ctx.setLineDash([5,5]);
+      const [p1x,p1y]=P(cx,cy,Rin,rot), [p2x,p2y]=P(cx,cy,Rin,rot-90);
+      ctx.beginPath(); ctx.moveTo(p1x,p1y); ctx.lineTo(cx,cy); ctx.lineTo(p2x,p2y); ctx.stroke(); ctx.setLineDash([]); ctx.restore();
+      arcArrow(ctx,cx,cy,R*0.3,rot,rot-88,{color:'#fff',width:3,head:10,alpha:b});
+      const [lx,ly]=P(cx,cy,R*0.42,rot-45); txt(ctx,'90°',lx,ly+8,{size:24,weight:900,align:'center',alpha:b});
+      arcArrow(ctx,cx,cy,R+58,140,40,{color:C.gold,width:5,head:18,alpha:b});
+      txt(ctx,'시계 방향 회전',cx,cy-R-78,{size:24,weight:700,align:'center',color:C.gold,alpha:b});
+      // legend
+      box(ctx,60,795,580,92,{alpha:b,fill:'#15203a'});
+      txt(ctx,'→ 인력: 90° 앞 전자석 S극이 영구자석 N극을 당김',80,830,{size:21,weight:700,color:C.good,alpha:b});
+      txt(ctx,'→ 척력: 뒤쪽 전자석 N극이 영구자석 N극을 밀어냄',80,868,{size:21,weight:700,color:C.bad,alpha:b2});
+    }
+    if(lt<=45){ wheel(ctx,95,825,58,-th*1,{alpha:fin(lt,1,1),label:false}); txt(ctx,'바퀴(중심축과 연결)',170,835,{size:22,color:C.sub,alpha:fin(lt,1,1)}); }
+    else { wheel(ctx,85,185,42,-th,{alpha:1,label:false}); txt(ctx,'바퀴',85,250,{size:20,align:'center',color:C.sub}); }
+    // graph
+    const gA=fin(lt,0.5,1);
+    graph3(ctx,740,350,370,260,th,{alpha:gA,dcMorph:ease((lt-3)/4),bProg:clamp((lt-10)/3.5),cProg:clamp((lt-12)/3.5),cursor:lt>=17});
+    // readouts at t1
+    if(lt>24&&lt<45){
+      const b=fin(lt,26,0.8)*fout(lt,44,0.6);
+      box(ctx,690,620,440,150,{alpha:b,fill:'#111a2c'});
+      const vals=currentsAt(th);
+      [['A–a',vals.A,C.A],['B–b',vals.B,C.B],['C–c',vals.C,C.Cc]].forEach(([n,v,col],i)=>{
+        const y=655+i*42; txt(ctx,n,710,y+8,{size:22,weight:700,color:col,alpha:b});
+        box(ctx,790,y-8,230,18,{alpha:b,fill:'#1f2937',stroke:null,r:9});
+        box(ctx,790,y-8,230*Math.abs(v)/300,18,{alpha:b,fill:col,stroke:null,r:9});
+        txt(ctx,(v>=0?'+':'−')+Math.abs(Math.round(v)),1030,y+8,{size:22,weight:700,alpha:b});
+      });
+      const [rx,ry]=resultant(vals);
+      txt(ctx,'합성 세기 '+Math.round(Math.hypot(rx,ry))+' (일정)',910,790,{size:22,weight:700,align:'center',color:C.good,alpha:b});
+    }
+    if(lt>=45){ phasor(ctx,910,725,I,{alpha:fin(lt,45,0.8)*0+1*fin(lt,45,0.8)}); }
+  }
+});
+
+// ---------- 5. BACK EMF ----------
+function speed5(lt){
+  if(lt<9) return 75*ease(lt/9);
+  if(lt<52) return 130-55*Math.exp(-(lt-9)/5);
+  return lerp(130-55*Math.exp(-43/5),195,ease((lt-52)/11));
+}
+function weak5(lt){ return lt<47?1:lerp(1,0.45,ease((lt-47)/5)); }
+function emf5(lt){ return speed5(lt)/130*95*weak5(lt); }
+function angle5(lt){ let a=0; const dt=1/30; for(let t=0;t<lt;t+=dt) a+=speed5(t)*2.4*dt; return a; }
+function gauge(ctx,cx,cy,r,v,o={}){
+  const {limit=null,alpha=1}=o; ctx.save(); ctx.globalAlpha*=alpha;
+  ctx.lineWidth=18; ctx.strokeStyle='#1f2937'; ctx.beginPath(); ctx.arc(cx,cy,r,Math.PI*0.75,Math.PI*2.25); ctx.stroke();
+  const f=clamp(v/220); ctx.strokeStyle=C.accent; ctx.beginPath(); ctx.arc(cx,cy,r,Math.PI*0.75,Math.PI*(0.75+1.5*f)); ctx.stroke();
+  if(limit){const lf=limit.v/220, a=Math.PI*(0.75+1.5*lf); ctx.save(); ctx.globalAlpha*=limit.alpha; ctx.strokeStyle=C.bad; ctx.lineWidth=6;
+    ctx.beginPath(); ctx.moveTo(cx+Math.cos(a)*(r-28),cy+Math.sin(a)*(r-28)); ctx.lineTo(cx+Math.cos(a)*(r+28),cy+Math.sin(a)*(r+28)); ctx.stroke(); ctx.restore();
+    txt(ctx,'속도 제한',cx+Math.cos(a)*(r+40)+30,cy+Math.sin(a)*(r+40),{size:20,weight:700,color:C.bad,alpha:limit.alpha,align:'center'});}
+  const a=Math.PI*(0.75+1.5*f); ctx.strokeStyle='#fff'; ctx.lineWidth=5; ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx+Math.cos(a)*(r-22),cy+Math.sin(a)*(r-22)); ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx,cy,10,0,Math.PI*2); ctx.fillStyle='#fff'; ctx.fill();
+  ctx.restore();
+  txt(ctx,'회전 속도',cx,cy+r*0.55,{size:22,align:'center',color:C.sub,alpha});
+  txt(ctx,String(Math.round(v)),cx,cy+r*0.55+40,{size:34,weight:900,align:'center',alpha});
+}
+SCENES.push({
+  title:'고속 주행 시 역기전력의 증가와 이를 줄이는 제어', short:'⑤ 역기전력과 제어', dur:66,
+  quote:'제어 시스템은 영구자석에 전자석이 겹쳐져 영구자석의 N극과 전자석의 S극이 같은 방향에 놓이도록 전류를 제어한다. 이때 고정자 내부에서 자기장의 방향이 서로 반대가 되면서 영구자석의 자기장 에너지와 전자석의 자기장 에너지가 상쇄된다.',
+  bullets:[[0,'특정 속도 이상 → 회전자가 빠르게 회전'],[9,'영구자석의 자기장 → 고정자의 자기장이 불안정'],[18,'안정된 자기장을 유지하려는 관성 → 역기전력 ↑'],[27,'역기전력이 배터리 전압 상쇄 → 전류 방해 → 속도 제한'],[37,'대책: 영구자석 N극 + 전자석 S극을 같은 방향에 (다른 극성!)'],[47,'자기장 방향 반대 → 자기장 에너지 상쇄'],[56,'역기전력 ↓ → 전류 원활 → 더 빠른 회전']],
+  steps:[[0,'자동차가 특정 속도 이상으로 달리면, 바퀴와 연결된 회전자도 아주 빠르게 회전해요.'],
+         [9,'그러면 빠르게 도는 영구자석의 자기장 때문에 고정자의 자기장이 불안정해져요.'],
+         [18,'이때 안정된 자기장을 유지하려는 관성 때문에 ‘역기전력’이 생기고, 속도가 빨라질수록 점점 커져요.'],
+         [27,'역기전력이 커져 배터리 전압을 상쇄하기 시작하면 고정자에 흐르는 전류가 방해받아, 전동기의 회전 속도에 제한이 생겨요.'],
+         [37,'이를 극복하기 위해 제어 시스템은 영구자석의 N극과 전자석의 S극이 같은 방향에 놓이도록(겹치도록) 전류를 제어해요.'],
+         [47,'그러면 고정자 내부에서 두 자기장의 방향이 서로 반대가 되어, 영구자석과 전자석의 자기장 에너지가 상쇄돼요.'],
+         [56,'그 결과 회전 속도를 제한하던 역기전력이 줄어들고, 전류가 다시 원활하게 흘러 전동기가 더 빠르게 회전할 수 있어요!']],
+  draw(ctx,lt){
+    const cx=330, cy=480, R=245;
+    const rot=-angle5(lt);
+    const off=lt<37?90:lerp(90,180,ease((lt-38)/6));
+    const instab=lt<9?0:(lt<47?clamp((lt-9)/6):lerp(1,0.15,ease((lt-47)/5)));
+    drawMotor(ctx,cx,cy,R,{rotorAngle:rot,slots:'six',I:null,em:{angle:rot+off,alpha:1},lt,wobble:instab*(lt<37?1:0.5),slotLabels:false});
+    if(instab>0.05&&lt<52){
+      const b=instab; ctx.save(); ctx.globalAlpha*=b;
+      box(ctx,cx-200,cy+R+28,400,52,{fill:'rgba(127,29,29,.85)',stroke:C.bad});
+      txt(ctx,'⚠ 고정자의 자기장이 불안정!',cx,cy+R+63,{size:26,weight:900,align:'center',color:'#fff'});
+      ctx.restore();
+    }
+    // overlap marker
+    if(lt>40){
+      const b=fin(lt,44,0.8);
+      const Rr=R*0.575; const [nx,ny]=P(cx,cy,Rr*0.95,rot);
+      ctx.save(); ctx.globalAlpha*=b; ctx.strokeStyle='#fff'; ctx.lineWidth=4; ctx.setLineDash([6,5]); ctx.beginPath(); ctx.arc(nx,ny,R*0.24,0,Math.PI*2); ctx.stroke(); ctx.restore();
+      txt(ctx,'영구자석 N극 ↔ 전자석 S극 같은 방향',cx,cy-R-40,{size:24,weight:700,align:'center',alpha:b,color:C.gold});
+    }
+    // gauge
+    gauge(ctx,770,300,118,speed5(lt),{limit:{v:130,alpha:lt>27&&lt<56?fin(lt,27,0.6)*fout(lt,55,0.8):0}});
+    // cancellation callout
+    if(lt>46){
+      const b=fin(lt,46.5,0.8), k=ease((lt-48)/4);
+      box(ctx,930,175,215,250,{alpha:b,fill:'#15203a'});
+      txt(ctx,'고정자 내부',1037,210,{size:22,weight:700,align:'center',alpha:b});
+      arrow(ctx,960,255,1115,255,{color:C.N,width:8,head:20,alpha:b}); txt(ctx,'영구자석 N극',1037,290,{size:19,align:'center',alpha:b,color:C.N,weight:700});
+      arrow(ctx,1115,325,960,325,{color:C.S,width:8,head:20,alpha:b}); txt(ctx,'전자석 S극',1037,360,{size:19,align:'center',alpha:b,color:C.S,weight:700});
+      txt(ctx,'방향 반대 → 상쇄',1037,405,{size:21,weight:900,align:'center',alpha:b*k,color:C.gold});
+    }
+    // bars
+    const bx=640, by=520, bw=430;
+    box(ctx,bx-20,by-50,bw+90,380,{fill:'#111a2c'});
+    const emf=emf5(lt), cur=Math.max(4,100-emf);
+    const bars=[['배터리 전압',100,'#60a5fa'],['역기전력',emf,C.bad],['고정자에 흐르는 전류',cur,C.good]];
+    bars.forEach(([n,v,col],i)=>{
+      const y=by+i*105;
+      txt(ctx,n,bx,y,{size:24,weight:700,color:col});
+      box(ctx,bx,y+16,bw,30,{fill:'#1f2937',stroke:null,r:15});
+      box(ctx,bx,y+16,bw*clamp(v/100),30,{fill:col,stroke:null,r:15});
+      txt(ctx,Math.round(v)+'%',bx+bw+12,y+40,{size:22,weight:700});
+    });
+    if(lt>27&&lt<52){const b=fin(lt,27.5,0.6); txt(ctx,'역기전력이 배터리 전압을 상쇄 → 전류 방해',bx+bw/2,by+300,{size:21,weight:700,align:'center',color:C.bad,alpha:b});}
+    if(lt>=52){const b=fin(lt,52,0.6); txt(ctx,'역기전력 감소 → 전류 회복 → 더 빠르게!',bx+bw/2,by+300,{size:21,weight:700,align:'center',color:C.good,alpha:b});}
+    wheel(ctx,95,830,52,rot*0.5,{alpha:1,label:false});
+  }
+});
+
+// ---------- 6. SUMMARY ----------
+SCENES.push({
+  title:'한눈에 정리 · 문항 연결 포인트', short:'⑥ 정리 · 문항', dur:44, full:true,
+  steps:[[0,'지문의 흐름: 자석의 성질 → 전동기의 구성 → 전자석 형성 → 회전하는 자기장 → 고속에서의 역기전력 제어'],
+         [14,'문항 연결: 지문 속 인과 관계를 그림으로 떠올리면, 선택지의 ‘일부만 바꾼 함정’을 쉽게 찾을 수 있어요.'],
+         [30,'특히 “같은 극성”과 “다른 극성”, “고정자”와 “회전자”처럼 한 단어만 바꾼 선택지에 주의하세요!']],
+  draw(ctx,lt){
+    const flow=[['자석의 성질','같은 극 척력 · 다른 극 인력'],['전동기 구성','회전자(영구자석) · 고정자(슬롯)'],['전자석 형성','전류 → 자기장 → N·S극'],['회전 자기장','교류 시간차 → 전자석 회전'],['역기전력 제어','N극–S극 겹침 → 상쇄']];
+    const fa=lt<14?1:fout(lt,13.5,0.6)*0+ (lt<14?1:0);
+    if(lt<14.2){
+      const a=fout(lt,13.6,0.6);
+      flow.forEach(([t,s],i)=>{
+        const b=a*fin(lt,0.5+i*1.6,0.7); const x=70+i*365, y=380;
+        box(ctx,x,y,310,200,{alpha:b,fill:'#15203a',stroke:C.accent});
+        badge(ctx,x+40,y+42,String(i+1),'#0ea5e9',{r:24,alpha:b,size:24});
+        txt(ctx,t,x+155,y+105,{size:34,weight:900,align:'center',alpha:b});
+        txt(ctx,s,x+155,y+155,{size:20,align:'center',alpha:b,color:C.sub});
+        if(i<4) arrow(ctx,x+316,y+100,x+360,y+100,{color:C.gold,width:5,head:16,alpha:a*fin(lt,1.3+i*1.6,0.5)});
+      });
+      txt(ctx,'영구자석 동기전동기 — 지문의 흐름',W/2,280,{size:44,weight:900,align:'center',alpha:a*fin(lt,0,0.8)});
+      return;
+    }
+    const a=fin(lt,14.2,0.6);
+    txt(ctx,'문항 연결 포인트 (정답과 근거)',W/2,215,{size:42,weight:900,align:'center',alpha:a});
+    const cards=[
+      ['11번','정답 ④','“고정자에는 영구자석이 부착되어…” ✗','영구자석은 고정자가 아니라 바퀴와 연결된 중심축의 ‘회전자’에 부착되어 있어요.'],
+      ['12번','정답 ⑤','“영구자석과 전자석의 같은 극성이 같은 방향” ✗','같은 극성이 아니라 영구자석의 N극과 전자석의 S극(다른 극성)이 같은 방향에 놓이도록 제어해요.'],
+      ['13번','정답 ④','㉠ 역기전력이 감소하는 이유','두 자기장의 방향이 반대 → 자기장 에너지 상쇄 → 영구자석의 자기장이 전자석의 자기장에 미치는 영향 감소.'],
+      ['14번','정답 ③','“A 구역 전류 방향이 바뀌는 것은 다른 구역 자기장 때문” ✗','전류 방향은 제어 시스템이 교류로 주기적으로 바꾸는 것이에요. 전류 방향이 바뀌어서 자기장 방향이 바뀌는 것이지, 그 반대가 아니에요.']
+    ];
+    cards.forEach(([q,ans,claim,why],i)=>{
+      const b=a*fin(lt,14.6+i*2.6,0.7); const x=80+(i%2)*890, y=260+Math.floor(i/2)*320;
+      box(ctx,x,y,870,295,{alpha:b,fill:'#15203a',stroke:i===1?C.gold:C.line});
+      txt(ctx,q,x+30,y+58,{size:38,weight:900,alpha:b,color:C.accent});
+      txt(ctx,ans,x+150,y+58,{size:32,weight:900,alpha:b,color:C.gold});
+      ctx.save(); ctx.globalAlpha*=b; ctx.font=font(25,700);
+      const ch=para(ctx,claim,x+30,y+92,810,{size:27,weight:700,color:'#fca5a5'});
+      para(ctx,why,x+30,y+108+ch,810,{size:27,weight:400,color:C.text});
+      ctx.restore();
+    });
+  }
+});
+
+/* ================= FRAME ================= */
+const STARTS=[]; let TOTAL=0; for(const s of SCENES){STARTS.push(TOTAL); TOTAL+=s.dur;}
+function sceneAt(T){ let i=SCENES.length-1; for(let k=0;k<SCENES.length;k++){ if(T<STARTS[k]+SCENES[k].dur){i=k;break;} } return [i,T-STARTS[i]]; }
+
+function drawPanel(ctx,s,lt){
+  const x=1190,y=130,w=690,h=770;
+  box(ctx,x,y,w,h,{fill:C.panel,stroke:C.line,r:18});
+  txt(ctx,'지문 속 근거',x+30,y+50,{size:24,weight:700,color:C.accent});
+  ctx.save(); ctx.font=font(23,400);
+  const qh=para(ctx,'“'+s.quote+'”',x+30,y+70,w-60,{size:23,lh:1.55,color:'#cbd5e1'});
+  ctx.restore();
+  let yy=y+70+qh+30;
+  ctx.strokeStyle=C.line; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(x+30,yy-12); ctx.lineTo(x+w-30,yy-12); ctx.stroke();
+  txt(ctx,'핵심 정리',x+30,yy+28,{size:24,weight:700,color:C.gold});
+  yy+=50;
+  for(const [t,b] of s.bullets){
+    const a=fin(lt,t,0.7); if(a<=0) continue;
+    const cur=lt>=t && (s.bullets.find(([t2])=>t2>t)?.[0]??1e9)>lt;
+    ctx.save(); ctx.globalAlpha*=a;
+    if(cur){box(ctx,x+18,yy-6,w-36,0+measureLines(ctx,b,w-90,25)*25*1.45+12,{fill:'rgba(56,189,248,.12)',stroke:null,r:10});}
+    ctx.beginPath(); ctx.arc(x+40,yy+17,6,0,Math.PI*2); ctx.fillStyle=cur?C.accent:'#64748b'; ctx.fill();
+    const hgt=para(ctx,b,x+60,yy,w-90,{size:25,lh:1.45,weight:cur?700:400,color:cur?'#fff':'#cbd5e1'});
+    ctx.restore();
+    yy+=hgt+14;
+  }
+}
+function measureLines(ctx,s,maxW,size){ctx.save(); ctx.font=font(size,700); const n=wrap(ctx,s,maxW).length; ctx.restore(); return n;}
+
+function renderAt(T){
+  const ctx=document.getElementById('cv').getContext('2d');
+  T=clamp(T,0,TOTAL-0.001);
+  const [i,lt]=sceneAt(T); const s=SCENES[i];
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.globalAlpha=1;
+  ctx.fillStyle=C.bg; ctx.fillRect(0,0,W,H);
+  const bgG=ctx.createRadialGradient(600,500,100,600,500,1100); bgG.addColorStop(0,'#101a30'); bgG.addColorStop(1,'#0a101d'); ctx.fillStyle=bgG; ctx.fillRect(0,0,W,H);
+  // header
+  if(i>0) badge(ctx,80,62,String(i),'#0ea5e9',{r:32,size:32});
+  txt(ctx,s.title,i>0?130:60,78,{size:42,weight:900});
+  txt(ctx,'2026 10월 고1 학평 국어 [11~14] · 영구자석 동기전동기',1880,74,{size:20,align:'right',color:C.sub});
+  ctx.strokeStyle=C.line; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(40,112); ctx.lineTo(1880,112); ctx.stroke();
+  // scene body
+  ctx.save();
+  const sceneFade=fin(lt,0,0.6)*fout(lt,s.dur-0.45,0.45);
+  ctx.globalAlpha=sceneFade;
+  ctx.beginPath(); s.full?ctx.rect(0,114,W,800):ctx.rect(30,120,1140,790); ctx.clip();
+  s.draw(ctx,lt);
+  ctx.restore();
+  if(!s.full){ ctx.save(); ctx.globalAlpha=sceneFade; drawPanel(ctx,s,lt); ctx.restore(); }
+  // caption
+  let cap=s.steps[0], ci=0; s.steps.forEach((st,k)=>{if(lt>=st[0]){cap=st;ci=k;}});
+  box(ctx,40,920,1840,120,{fill:'rgba(15,23,42,.95)',stroke:C.line,r:16});
+  const ca=fin(lt,cap[0],0.5)*sceneFade;
+  ctx.save(); ctx.font=font(33,500); const lines=wrap(ctx,cap[1],1760); ctx.restore();
+  const lh=46, y0=980-(lines.length-1)*lh/2;
+  lines.forEach((l,k)=>txt(ctx,l,W/2,y0+k*lh+12,{size:33,weight:500,align:'center',alpha:ca}));
+  // progress
+  const px=40,pw=1840,py=1056;
+  SCENES.forEach((sc,k)=>{const x=px+pw*STARTS[k]/TOTAL, w=pw*sc.dur/TOTAL-4; box(ctx,x,py,w,10,{fill:'#1f2937',stroke:null,r:5});
+    const f=clamp((T-STARTS[k])/sc.dur); if(f>0) box(ctx,x,py,Math.max(6,w*f),10,{fill:k===i?C.accent:'#2f6f8f',stroke:null,r:5});});
+}
+
+/* ================= PLAYER ================= */
+const isRender=/[?&]render/.test(location.search);
+window.renderAt=renderAt; window.TOTAL=TOTAL; window.STARTS=STARTS;
+if(isRender){ document.documentElement.classList.add('render'); }
+else {
+  let T=0, playing=false, last=null;
+  const btn=document.getElementById('play'), seek=document.getElementById('seek'), time=document.getElementById('time'), chips=document.getElementById('chips');
+  const fmt=s=>Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0');
+  SCENES.forEach((s,k)=>{const b=document.createElement('button'); b.textContent=s.short; b.onclick=()=>{T=STARTS[k]+0.01; draw();}; chips.appendChild(b);});
+  function draw(){ renderAt(T); seek.value=Math.round(T/TOTAL*1000); time.textContent=fmt(T)+' / '+fmt(TOTAL);
+    const [i]=sceneAt(T); [...chips.children].forEach((c,k)=>c.classList.toggle('on',k===i)); }
+  function loop(ts){ if(playing){ if(last!=null) T+= (ts-last)/1000; last=ts; if(T>=TOTAL){T=TOTAL-0.01; setPlay(false);} draw(); requestAnimationFrame(loop);} }
+  function setPlay(p){ playing=p; btn.textContent=p?'⏸ 일시정지':'▶ 재생'; last=null; if(p){ if(T>=TOTAL-0.05) T=0; requestAnimationFrame(loop);} }
+  btn.onclick=()=>setPlay(!playing);
+  seek.oninput=()=>{T=seek.value/1000*TOTAL; draw();};
+  document.getElementById('prev').onclick=()=>{const [i,lt]=sceneAt(T); T=STARTS[Math.max(0,lt<1.5?i-1:i)]+0.01; draw();};
+  document.getElementById('next').onclick=()=>{const [i]=sceneAt(T); T=STARTS[Math.min(SCENES.length-1,i+1)]+0.01; draw();};
+  addEventListener('keydown',e=>{ if(e.code==='Space'){e.preventDefault(); setPlay(!playing);} if(e.code==='ArrowRight'){T=Math.min(TOTAL-0.01,T+5); draw();} if(e.code==='ArrowLeft'){T=Math.max(0,T-5); draw();} });
+  (document.fonts?document.fonts.load('700 30px "Noto Sans KR"').catch(()=>{}):Promise.resolve()).then(()=>draw());
+  draw();
+}
+</script>
+</body>
+</html>
