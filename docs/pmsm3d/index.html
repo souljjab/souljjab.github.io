@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>3D 영구자석 동기전동기 — 2026 10월 고1 학평 국어 [11~14]</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;background:#060a14;color:#e5e7eb;font-family:"Noto Sans KR","Noto Sans CJK KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif}
+  #wrap{max-width:1600px;margin:0 auto;padding:12px}
+  #stageBox{position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;border-radius:10px;background:#0b1220}
+  #stage{position:absolute;left:0;top:0;width:1920px;height:1080px;transform-origin:0 0;background:radial-gradient(ellipse at 30% 45%,#101a30,#0a101d 70%)}
+  #hdr{position:absolute;left:40px;right:40px;top:0;height:110px;border-bottom:2px solid #2b3a57;display:flex;align-items:center;gap:20px}
+  #badge{width:64px;height:64px;border-radius:50%;background:#0ea5e9;display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:900;flex:none}
+  #title{font-size:42px;font-weight:900;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #tag{font-size:20px;color:#94a3b8;white-space:nowrap}
+  #view{position:absolute;left:30px;top:120px;width:1240px;height:790px;border-radius:16px;overflow:hidden;background:#0b1220;border:1px solid #1f2b44}
+  #gl,#hud{position:absolute;left:0;top:0;width:1240px;height:790px}
+  #gl{touch-action:none;cursor:grab}
+  #hud{pointer-events:none}
+  #labels{position:absolute;left:0;top:0;width:1240px;height:790px;pointer-events:none}
+  .lab{position:absolute;left:0;top:0;padding:4px 14px;border-radius:18px;border:2px solid;background:rgba(15,23,42,.88);font-size:22px;font-weight:900;white-space:nowrap}
+  #panel{position:absolute;left:1300px;top:120px;width:590px;height:790px;box-sizing:border-box;background:#121b2d;border:2px solid #2b3a57;border-radius:18px;padding:26px 28px;overflow:hidden}
+  .ph{font-size:24px;font-weight:700;color:#38bdf8;margin-bottom:10px}
+  #quote{font-size:22px;line-height:1.55;color:#cbd5e1;padding-bottom:18px;border-bottom:2px solid #2b3a57;margin-bottom:16px}
+  .ph2{font-size:24px;font-weight:700;color:#fbbf24;margin-bottom:10px}
+  #bullets{list-style:none;margin:0;padding:0}
+  #bullets li{font-size:24px;line-height:1.45;padding:7px 10px 7px 34px;position:relative;border-radius:10px;color:#cbd5e1;margin-bottom:6px;transition:opacity .3s}
+  #bullets li::before{content:'';position:absolute;left:12px;top:19px;width:11px;height:11px;border-radius:50%;background:#64748b}
+  #bullets li.cur{background:rgba(56,189,248,.12);color:#fff;font-weight:700}
+  #bullets li.cur::before{background:#38bdf8}
+  #bullets li.hide{opacity:0}
+  #cap{position:absolute;left:40px;top:920px;width:1840px;height:120px;box-sizing:border-box;background:rgba(15,23,42,.95);border:2px solid #2b3a57;border-radius:16px;display:flex;align-items:center;justify-content:center;padding:0 40px}
+  #captext{font-size:33px;line-height:1.4;text-align:center}
+  #prog{position:absolute;left:40px;top:1056px;width:1840px;height:10px;display:flex;gap:4px}
+  #prog div{height:10px;border-radius:5px;background:#1f2937;position:relative;overflow:hidden}
+  #prog div i{position:absolute;left:0;top:0;bottom:0;background:#2f6f8f}
+  #prog div.on i{background:#38bdf8}
+  #ui{margin-top:12px;display:grid;gap:10px}
+  .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .row b{font-size:15px;color:#fbbf24;margin-right:4px}
+  button{background:#1e293b;color:#e5e7eb;border:1px solid #334155;border-radius:8px;padding:8px 14px;font:inherit;font-size:15px;cursor:pointer;min-height:40px}
+  button:hover{background:#273449} button.on{background:#0ea5e9;border-color:#0ea5e9;color:#04121f;font-weight:700}
+  button:focus-visible,input:focus-visible{outline:3px solid #38bdf8;outline-offset:2px}
+  label.sl{display:flex;align-items:center;gap:8px;font-size:15px;color:#cbd5e1;background:#111a2c;border:1px solid #2b3a57;border-radius:8px;padding:6px 10px}
+  #seek{flex:1;min-width:200px}
+  #time{font-variant-numeric:tabular-nums;font-size:14px;color:#94a3b8}
+  #exrow{display:none} .explore #exrow{display:flex} .explore #tourrow2{opacity:.5}
+  #note{font-size:14px;color:#94a3b8;line-height:1.6}
+  .render #ui,.render #note{display:none} .render #wrap{padding:0;max-width:none} .render #stageBox{border-radius:0;width:1920px;height:1080px;aspect-ratio:auto} .render #gl{cursor:default}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="stageBox"><div id="stage">
+    <div id="hdr"><div id="badge">0</div><div id="title"></div><div id="tag">2026 10월 고1 학평 국어 [11~14] · 3D 영구자석 동기전동기</div></div>
+    <div id="view"><canvas id="gl" width="1240" height="790"></canvas><canvas id="hud" width="1240" height="790"></canvas><div id="labels"></div></div>
+    <div id="panel"><div class="ph">지문 속 근거</div><div id="quote"></div><div class="ph2">핵심 정리</div><ul id="bullets"></ul></div>
+    <div id="cap"><div id="captext"></div></div>
+    <div id="prog"></div>
+  </div></div>
+  <div id="ui">
+    <div class="row" id="tourrow"><b>투어</b><button id="play">▶ 재생</button><input id="seek" type="range" min="0" max="1000" value="0"><span id="time"></span></div>
+    <div class="row" id="tourrow2"><span id="chips" class="row"></span></div>
+    <div class="row"><b>직접 탐색</b><span id="modes" class="row"></span></div>
+    <div class="row" id="exrow">
+      <label class="sl">회전 속도 <input id="s_speed" type="range" min="0" max="3" step="0.1" value="1"></label>
+      <label class="sl">고정자 투명도 <input id="s_op" type="range" min="0.1" max="1" step="0.05" value="1"></label>
+      <label class="sl">분해 보기 <input id="s_ex" type="range" min="0" max="1" step="0.05" value="0"></label>
+      <label class="sl">차량 속도 <input id="s_vel" type="range" min="0" max="200" step="5" value="60"></label>
+      <button id="b_fw">약계자 제어: 끔</button><button id="b_lab" class="on">라벨: 켬</button><button id="b_view">정면에서 보기</button>
+    </div>
+  </div>
+  <div id="note">투어는 자막과 함께 장면을 차례로 보여 줘요. “직접 탐색”을 누르면 3D 모형을 마우스(손가락)로 끌어 돌리고, 휠(두 손가락)로 확대할 수 있어요. 스페이스바: 투어 재생/일시정지.</div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js"></script>
+<script>
+'use strict';
+const W = 1920, H = 1080;
+const FONT = '"Noto Sans KR","Noto Sans CJK KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif';
+const C = {
+  bg:'#0b1220', panel:'#121b2d', panel2:'#1a2640', line:'#2b3a57', text:'#e5e7eb', sub:'#94a3b8',
+  N:'#ef4444', S:'#3b82f6', field:'#fde047', A:'#fb923c', B:'#4ade80', Cc:'#c084fc',
+  accent:'#38bdf8', stator:'#4b5b74', statorDark:'#3a4860', rotor:'#2a3547', gold:'#fbbf24', good:'#34d399', bad:'#f87171'
+};
+const PH = {A:C.A, B:C.B, C:C.Cc};
+const D2R = Math.PI/180;
+const clamp = (x,a=0,b=1)=>Math.max(a,Math.min(b,x));
+const ease = t=>{t=clamp(t);return t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;};
+const fin = (lt,s,d=0.8)=>ease((lt-s)/d);
+const fout = (lt,s,d=0.8)=>1-ease((lt-s)/d);
+const lerp = (a,b,t)=>a+(b-a)*t;
+const P = (cx,cy,r,deg)=>[cx+r*Math.cos(deg*D2R), cy-r*Math.sin(deg*D2R)];
+const font = (sz,w=500)=>`${w} ${sz}px ${FONT}`;
+
+function txt(ctx,s,x,y,o={}){
+  const {size=28,color=C.text,align='left',base='alphabetic',weight=500,alpha=1}=o;
+  if(alpha<=0) return;
+  ctx.save(); ctx.globalAlpha*=alpha; ctx.font=font(size,weight); ctx.fillStyle=color;
+  ctx.textAlign=align; ctx.textBaseline=base; ctx.fillText(s,x,y); ctx.restore();
+}
+function wrap(ctx,s,maxW){
+  const out=[];
+  for(const para of s.split('\n')){
+    const words=para.split(' '); let line='';
+    for(const w of words){
+      const test=line?line+' '+w:w;
+      if(ctx.measureText(test).width<=maxW){line=test;continue;}
+      if(line) out.push(line);
+      if(ctx.measureText(w).width>maxW){ // break long word by chars
+        let cur='';
+        for(const ch of w){ if(ctx.measureText(cur+ch).width>maxW){out.push(cur);cur=ch;} else cur+=ch; }
+        line=cur;
+      } else line=w;
+    }
+    out.push(line);
+  }
+  return out;
+}
+function para(ctx,s,x,y,maxW,o={}){
+  const {size=26,lh=1.55,color=C.text,weight=400,alpha=1,align='left'}=o;
+  ctx.save(); ctx.font=font(size,weight);
+  const lines=wrap(ctx,s,maxW);
+  ctx.globalAlpha*=alpha; ctx.fillStyle=color; ctx.textAlign=align; ctx.textBaseline='top';
+  lines.forEach((l,i)=>ctx.fillText(l,x,y+i*size*lh));
+  ctx.restore();
+  return lines.length*size*lh;
+}
+function rr(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
+function arrow(ctx,x1,y1,x2,y2,o={}){
+  const {color='#fff',width=4,head=16,alpha=1,dash=null}=o;
+  if(alpha<=0) return;
+  const a=Math.atan2(y2-y1,x2-x1), len=Math.hypot(x2-x1,y2-y1);
+  const hh=Math.min(head,len*0.6);
+  ctx.save(); ctx.globalAlpha*=alpha; ctx.strokeStyle=color; ctx.fillStyle=color; ctx.lineWidth=width; ctx.lineCap='round';
+  if(dash) ctx.setLineDash(dash);
+  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2-Math.cos(a)*hh*0.8,y2-Math.sin(a)*hh*0.8); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.beginPath(); ctx.moveTo(x2,y2);
+  ctx.lineTo(x2-hh*Math.cos(a-0.45),y2-hh*Math.sin(a-0.45));
+  ctx.lineTo(x2-hh*Math.cos(a+0.45),y2-hh*Math.sin(a+0.45)); ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+// arc arrow in math degrees from a1 to a2 (direction follows sign of a2-a1)
+function arcArrow(ctx,cx,cy,r,a1,a2,o={}){
+  const {color='#fff',width=4,head=16,alpha=1}=o;
+  if(alpha<=0) return;
+  ctx.save(); ctx.globalAlpha*=alpha; ctx.strokeStyle=color; ctx.fillStyle=color; ctx.lineWidth=width; ctx.lineCap='round';
+  const dir=Math.sign(a2-a1)||1; const back=(head*0.8/r)/D2R*dir;
+  ctx.beginPath(); ctx.arc(cx,cy,r,-a1*D2R,-(a2-back)*D2R,dir>0); ctx.stroke();
+  const [ex,ey]=P(cx,cy,r,a2); const tang=(a2*D2R)+dir*Math.PI/2; // direction of motion (math)
+  const tx=Math.cos(tang), ty=-Math.sin(tang); const ang=Math.atan2(ty,tx);
+  ctx.beginPath(); ctx.moveTo(ex,ey);
+  ctx.lineTo(ex-head*Math.cos(ang-0.45),ey-head*Math.sin(ang-0.45));
+  ctx.lineTo(ex-head*Math.cos(ang+0.45),ey-head*Math.sin(ang+0.45)); ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+function badge(ctx,x,y,label,color,o={}){
+  const {r=24,alpha=1,dashed=false,size=26,fill=null}=o;
+  if(alpha<=0) return;
+  ctx.save(); ctx.globalAlpha*=alpha;
+  ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2);
+  ctx.fillStyle=fill||color; ctx.fill();
+  if(dashed){ctx.setLineDash([5,4]); ctx.strokeStyle='#fff'; ctx.lineWidth=2.5; ctx.stroke();}
+  ctx.restore();
+  txt(ctx,label,x,y+1,{size,weight:900,align:'center',base:'middle',alpha,color:'#fff'});
+}
+// symbols ⊙ / ⊗
+function curSym(ctx,x,y,r,out,o={}){
+  const {alpha=1,color='#fff',bg='#0b1220'}=o; if(alpha<=0) return;
+  ctx.save(); ctx.globalAlpha*=alpha; ctx.lineWidth=Math.max(2,r*0.16); ctx.strokeStyle=color; ctx.fillStyle=bg;
+  ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle=color;
+  if(out){ ctx.beginPath(); ctx.arc(x,y,r*0.28,0,Math.PI*2); ctx.fill(); }
+  else { const k=r*0.62; ctx.beginPath(); ctx.moveTo(x-k,y-k); ctx.lineTo(x+k,y+k); ctx.moveTo(x+k,y-k); ctx.lineTo(x-k,y+k); ctx.stroke(); }
+  ctx.restore();
+}
+// polyline helper with dash animation
+function poly(ctx,pts,o={}){
+  const {color=C.field,width=2.5,alpha=1,dash=null,offset=0}=o; if(alpha<=0||pts.length<2) return;
+  ctx.save(); ctx.globalAlpha*=alpha; ctx.strokeStyle=color; ctx.lineWidth=width; ctx.lineJoin='round'; ctx.lineCap='round';
+  if(dash){ctx.setLineDash(dash); ctx.lineDashOffset=offset;}
+  ctx.beginPath(); ctx.moveTo(pts[0][0],pts[0][1]); for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i][0],pts[i][1]); ctx.stroke();
+  ctx.restore();
+}
+function headAlong(ctx,pts,frac,o={}){
+  if(pts.length<4) return;
+  const {color=C.field,size=13,alpha=1}=o;
+  let total=0; const seg=[]; for(let i=1;i<pts.length;i++){const d=Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1]); seg.push(d); total+=d;}
+  let target=total*frac, i=0; while(i<seg.length-1&&target>seg[i]){target-=seg[i];i++;}
+  const a=pts[i], b=pts[i+1]; const t=seg[i]?target/seg[i]:0; const x=lerp(a[0],b[0],t), y=lerp(a[1],b[1],t);
+  const ang=Math.atan2(b[1]-a[1],b[0]-a[0]);
+  ctx.save(); ctx.globalAlpha*=alpha; ctx.fillStyle=color; ctx.beginPath();
+  ctx.moveTo(x+size*0.6*Math.cos(ang),y+size*0.6*Math.sin(ang));
+  ctx.lineTo(x-size*0.6*Math.cos(ang)+size*0.5*Math.cos(ang+Math.PI/2),y-size*0.6*Math.sin(ang)+size*0.5*Math.sin(ang+Math.PI/2));
+  ctx.lineTo(x-size*0.6*Math.cos(ang)-size*0.5*Math.cos(ang+Math.PI/2),y-size*0.6*Math.sin(ang)-size*0.5*Math.sin(ang+Math.PI/2));
+  ctx.closePath(); ctx.fill(); ctx.restore();
+}
+function box(ctx,x,y,w,h,o={}){
+  const {fill=C.panel2,stroke=C.line,r=14,alpha=1,lw=2}=o; if(alpha<=0) return;
+  ctx.save(); ctx.globalAlpha*=alpha; rr(ctx,x,y,w,h,r); ctx.fillStyle=fill; ctx.fill(); if(stroke){ctx.strokeStyle=stroke; ctx.lineWidth=lw; ctx.stroke();} ctx.restore();
+}
+
+
+const PHDIR={A:0,B:-120,C:120}; // field direction (math deg) at centre for +current
+function currentsAt(theta){ // theta deg ; returns {A,B,C} in units (max 300)
+  return {A:300*Math.sin(theta*D2R), B:300*Math.sin((theta-120)*D2R), C:300*Math.sin((theta+120)*D2R)};
+}
+function resultant(I){
+  let x=0,y=0; for(const k of ['A','B','C']){x+=I[k]*Math.cos(PHDIR[k]*D2R); y+=I[k]*Math.sin(PHDIR[k]*D2R);} return [x,y];
+}
+
+function graph3(ctx,x0,y0,w,h,theta,o={}){
+  const {alpha=1,dcMorph=1,bProg=1,cProg=1,cursor=true}=o; if(alpha<=0) return;
+  ctx.save(); ctx.globalAlpha*=alpha;
+  box(ctx,x0-70,y0-h/2-60,w+110,h+150,{fill:'#111a2c'});
+  const sy=(h/2)/300; const X=t=>x0+w*t/360, Y=v=>y0-v*sy;
+  ctx.strokeStyle='#334155'; ctx.lineWidth=1.5; ctx.setLineDash([5,5]);
+  for(const v of [-300,-150,150,300]){ctx.beginPath(); ctx.moveTo(x0,Y(v)); ctx.lineTo(x0+w,Y(v)); ctx.stroke(); txt(ctx,String(v),x0-12,Y(v)+7,{size:18,align:'right',color:C.sub});}
+  for(const t of [90,180,270,360]){ctx.beginPath(); ctx.moveTo(X(t),Y(300)); ctx.lineTo(X(t),Y(-300)); ctx.stroke();}
+  ctx.setLineDash([]); ctx.strokeStyle='#cbd5e1'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(x0,Y(0)); ctx.lineTo(x0+w+10,Y(0)); ctx.moveTo(x0,Y(320)); ctx.lineTo(x0,Y(-320)); ctx.stroke();
+  txt(ctx,'0',x0-12,Y(0)+7,{size:18,align:'right',color:C.sub});
+  ['t₀','t₁','t₂','t₃','t₄'].forEach((s,i)=>txt(ctx,s,X(i*90),Y(-300)+34,{size:24,align:'center',weight:700}));
+  txt(ctx,'전류의 세기(I)',x0-50,y0-h/2-25,{size:20,color:C.sub});
+  txt(ctx,'시간',x0+w+18,Y(0)+6,{size:20,color:C.sub});
+  const curve=(fn,col,dash,prog)=>{ if(prog<=0) return; ctx.save(); ctx.strokeStyle=col; ctx.lineWidth=4; if(dash) ctx.setLineDash(dash); ctx.beginPath();
+    for(let t=0;t<=360*prog;t+=2){const v=fn(t); t?ctx.lineTo(X(t),Y(v)):ctx.moveTo(X(t),Y(v));} ctx.stroke(); ctx.restore(); };
+  curve(t=>lerp(220,currentsAt(t).A,dcMorph),C.A,null,1);
+  if(dcMorph<0.6) txt(ctx,'직류 (배터리)',X(250),Y(220)-14,{size:22,color:C.A,weight:700,alpha:1-dcMorph/0.6});
+  curve(t=>currentsAt(t).B,C.B,[14,9],bProg);
+  curve(t=>currentsAt(t).C,C.Cc,[4,7],cProg);
+  // legend
+  const ly=Y(-300)+72;
+  [['A–a 쌍',C.A,null],['B–b 쌍',C.B,[14,9]],['C–c 쌍',C.Cc,[4,7]]].forEach(([s,col,d],i)=>{
+    const lx=x0-30+i*140; ctx.save(); ctx.strokeStyle=col; ctx.lineWidth=4; if(d) ctx.setLineDash(d); ctx.beginPath(); ctx.moveTo(lx,ly); ctx.lineTo(lx+40,ly); ctx.stroke(); ctx.restore();
+    txt(ctx,s,lx+48,ly+7,{size:20,color:col,weight:700});
+  });
+  if(cursor){
+    const t=((theta%360)+360)%360; const tt=(theta>=360&&t<0.01)?360:t;
+    ctx.strokeStyle='#fff'; ctx.lineWidth=2.5; ctx.beginPath(); ctx.moveTo(X(tt),Y(320)); ctx.lineTo(X(tt),Y(-320)); ctx.stroke();
+    const I=currentsAt(tt);
+    for(const [k,col] of [['A',C.A],['B',C.B],['C',C.Cc]]){ctx.beginPath(); ctx.arc(X(tt),Y(I[k]),8,0,Math.PI*2); ctx.fillStyle=col; ctx.fill(); ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke();}
+  }
+  ctx.restore();
+}
+
+function gauge(ctx,cx,cy,r,v,o={}){
+  const {limit=null,alpha=1}=o; ctx.save(); ctx.globalAlpha*=alpha;
+  ctx.lineWidth=18; ctx.strokeStyle='#1f2937'; ctx.beginPath(); ctx.arc(cx,cy,r,Math.PI*0.75,Math.PI*2.25); ctx.stroke();
+  const f=clamp(v/220); ctx.strokeStyle=C.accent; ctx.beginPath(); ctx.arc(cx,cy,r,Math.PI*0.75,Math.PI*(0.75+1.5*f)); ctx.stroke();
+  if(limit){const lf=limit.v/220, a=Math.PI*(0.75+1.5*lf); ctx.save(); ctx.globalAlpha*=limit.alpha; ctx.strokeStyle=C.bad; ctx.lineWidth=6;
+    ctx.beginPath(); ctx.moveTo(cx+Math.cos(a)*(r-28),cy+Math.sin(a)*(r-28)); ctx.lineTo(cx+Math.cos(a)*(r+28),cy+Math.sin(a)*(r+28)); ctx.stroke(); ctx.restore();
+    txt(ctx,'속도 제한',cx+Math.cos(a)*(r+40)+30,cy+Math.sin(a)*(r+40),{size:20,weight:700,color:C.bad,alpha:limit.alpha,align:'center'});}
+  const a=Math.PI*(0.75+1.5*f); ctx.strokeStyle='#fff'; ctx.lineWidth=5; ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx+Math.cos(a)*(r-22),cy+Math.sin(a)*(r-22)); ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx,cy,10,0,Math.PI*2); ctx.fillStyle='#fff'; ctx.fill();
+  ctx.restore();
+  txt(ctx,'회전 속도',cx,cy+r*0.55,{size:22,align:'center',color:C.sub,alpha});
+  txt(ctx,String(Math.round(v)),cx,cy+r*0.55+40,{size:34,weight:900,align:'center',alpha});
+}
+
+/* ================= 3D PMSM ================= */
+const L=3.2, RO=3.0, RI=1.95, SD=0.42, RR=1.78, NSLOT=36, WZ=-6.4;
+const PHC={A:0xfb923c,B:0x4ade80,C:0xc084fc};
+const REG=[{n:'A',a:90,ph:'A',cap:true},{n:'c',a:30,ph:'C',cap:false},{n:'B',a:-30,ph:'B',cap:true},{n:'a',a:-90,ph:'A',cap:false},{n:'C',a:-150,ph:'C',cap:true},{n:'b',a:150,ph:'B',cap:false}];
+const rad=d=>d*Math.PI/180;
+const nearestReg=a=>{let best=REG[0],bd=999; for(const r of REG){const d=Math.abs(((a-r.a)%360+540)%360-180); if(d<bd){bd=d;best=r;}} return best;};
+const isRender=/[?&]render/.test(location.search);
+const glc=document.getElementById('gl');
+const renderer=new THREE.WebGLRenderer({canvas:glc,antialias:true,preserveDrawingBuffer:true,alpha:false});
+renderer.setPixelRatio(isRender?1:Math.min(2,window.devicePixelRatio||1)); renderer.setSize(1240,790,false);
+renderer.setClearColor(0x0b1220,1);
+const scene=new THREE.Scene(); scene.fog=new THREE.Fog(0x0b1220,30,70);
+const camera=new THREE.PerspectiveCamera(38,1240/790,0.1,200);
+scene.add(new THREE.HemisphereLight(0xdbeafe,0x1e293b,0.9));
+const dl=new THREE.DirectionalLight(0xffffff,0.9); dl.position.set(6,9,12); scene.add(dl);
+const dl2=new THREE.DirectionalLight(0x93c5fd,0.35); dl2.position.set(-8,-4,-10); scene.add(dl2);
+// floor grid
+const grid=new THREE.GridHelper(40,40,0x1e293b,0x152033); grid.position.y=-3.6; scene.add(grid);
+
+/* stator */
+const statorG=new THREE.Group(); scene.add(statorG);
+const shape=new THREE.Shape(); shape.absarc(0,0,RO,0,Math.PI*2,false);
+const hole=new THREE.Path(); const hw=0.11;
+{ const pts=[]; for(let k=0;k<NSLOT;k++){ const a=rad(5+10*k), w=hw/RI, a0=rad(5+10*(k-1))+w;
+    for(let s=0;s<=6;s++){ const t=a0+(a-w-a0)*s/6; pts.push([RI*Math.cos(t),RI*Math.sin(t)]); }
+    const ux=Math.cos(a), uy=Math.sin(a), tx=-uy, ty=ux;
+    pts.push([RI*ux-hw*tx,RI*uy-hw*ty],[(RI+SD)*ux-hw*tx,(RI+SD)*uy-hw*ty],[(RI+SD)*ux+hw*tx,(RI+SD)*uy+hw*ty],[RI*ux+hw*tx,RI*uy+hw*ty]); }
+  hole.moveTo(pts[0][0],pts[0][1]); for(const p of pts.slice(1)) hole.lineTo(p[0],p[1]); hole.closePath(); }
+shape.holes.push(hole);
+const stGeo=new THREE.ExtrudeGeometry(shape,{depth:L,bevelEnabled:false,curveSegments:72}); stGeo.translate(0,0,-L/2);
+const stMat=new THREE.MeshStandardMaterial({color:0x8090a8,metalness:0.55,roughness:0.42,transparent:true,opacity:1,side:THREE.DoubleSide});
+const stMesh=new THREE.Mesh(stGeo,stMat); statorG.add(stMesh);
+const glowMat=new THREE.MeshBasicMaterial({color:0x38bdf8,transparent:true,opacity:0,side:THREE.DoubleSide,depthWrite:false});
+const stGlow=new THREE.Mesh(new THREE.CylinderGeometry(RO+0.04,RO+0.04,L+0.04,72,1,true).rotateX(Math.PI/2),glowMat); statorG.add(stGlow);
+// slot channel highlight strips
+const slotHL=[]; const slotHLMat=new THREE.MeshBasicMaterial({color:0xfde047,transparent:true,opacity:0,depthWrite:false});
+// copper bars
+const bars=[];
+for(let k=0;k<NSLOT;k++){ const a=5+10*k, r=nearestReg(a);
+  const m=new THREE.MeshStandardMaterial({color:0x6b4a2f,metalness:0.35,roughness:0.55,emissive:PHC[r.ph],emissiveIntensity:0});
+  const b=new THREE.Mesh(new THREE.BoxGeometry(0.18,SD*0.78,L*0.995),m); b.position.set((RI+SD*0.52)*Math.cos(rad(a)),(RI+SD*0.52)*Math.sin(rad(a)),0); b.rotation.z=rad(a-90);
+  statorG.add(b); bars.push({mesh:b,reg:r,a});
+  const h=new THREE.Mesh(new THREE.BoxGeometry(0.24,0.06,L+0.02),slotHLMat); h.position.set((RI-0.02)*Math.cos(rad(a)),(RI-0.02)*Math.sin(rad(a)),0); h.rotation.z=rad(a-90); statorG.add(h); slotHL.push(h); }
+const _copper=new THREE.Color(0x6b4a2f), _phc={A:new THREE.Color(PHC.A),B:new THREE.Color(PHC.B),C:new THREE.Color(PHC.C)};
+// end turns + loop paths
+const RW=RI+SD*0.52;
+function regionAngle(ph,cap){ return REG.find(r=>r.ph===ph&&r.cap===cap).a; }
+const pairs={};
+['A','B','C'].forEach((ph,i)=>{
+  const aU=regionAngle(ph,true), aL=regionAngle(ph,false); const hgt=0.35+i*0.26, rr=RW+0.12*i;
+  const arc=(z0,dirSign,from,to)=>{ const pts=[]; const span=((to-from)%360+360)%360; const N=40;
+    pts.push(new THREE.Vector3(RW*Math.cos(rad(from)),RW*Math.sin(rad(from)),z0));
+    for(let s=0;s<=N;s++){ const t=s/N, ang=from+span*t; const lift=Math.sin(Math.PI*Math.min(1,Math.max(0,t)))*0.0; const r=lerp(RW,rr,Math.sin(Math.PI*t)*1); pts.push(new THREE.Vector3(r*Math.cos(rad(ang)),r*Math.sin(rad(ang)),z0+dirSign*(hgt*Math.min(1,Math.sin(Math.PI*t)*3)))); }
+    pts.push(new THREE.Vector3(RW*Math.cos(rad(to)),RW*Math.sin(rad(to)),z0)); return pts; };
+  const front=arc(L/2,1,aU,aL), back=arc(-L/2,-1,aL,aU);
+  const mat=new THREE.MeshStandardMaterial({color:0xb87333,metalness:0.6,roughness:0.4,emissive:PHC[ph],emissiveIntensity:0.15,transparent:true,opacity:1});
+  const tf=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(front),80,0.1,8,false),mat), tb=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(back),80,0.1,8,false),mat);
+  statorG.add(tf); statorG.add(tb);
+  // loop: U slot back->front, front arc, L slot front->back, back arc
+  const P=(a,z)=>new THREE.Vector3(RW*Math.cos(rad(a)),RW*Math.sin(rad(a)),z);
+  const loop=[]; for(let s=0;s<=10;s++) loop.push(P(aU,-L/2+L*s/10)); loop.push(...front.slice(1)); for(let s=1;s<=10;s++) loop.push(P(aL,L/2-L*s/10)); loop.push(...back.slice(1,-1));
+  const curve=new THREE.CatmullRomCurve3(loop,true,'catmullrom',0.05);
+  const dots=[]; const dm=new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0});
+  for(let k=0;k<14;k++){ const d=new THREE.Mesh(new THREE.SphereGeometry(0.075,10,8),dm); statorG.add(d); dots.push(d); }
+  pairs[ph]={mat,curve,dots,dm,phase:0};
+});
+
+/* rotor */
+const rotorG=new THREE.Group(); scene.add(rotorG);
+const roMat=new THREE.MeshStandardMaterial({color:0x334155,metalness:0.5,roughness:0.5,transparent:true,opacity:1});
+const roMesh=new THREE.Mesh(new THREE.CylinderGeometry(RR,RR,L*0.98,64).rotateX(Math.PI/2),roMat); rotorG.add(roMesh);
+const magG=new THREE.Group(); rotorG.add(magG);
+const nMat=new THREE.MeshStandardMaterial({color:0xef4444,metalness:0.2,roughness:0.5,transparent:true,opacity:1}), sMat=new THREE.MeshStandardMaterial({color:0x3b82f6,metalness:0.2,roughness:0.5,transparent:true,opacity:1});
+const nBox=new THREE.Mesh(new THREE.BoxGeometry(1.45,0.92,L*0.99+0.04),nMat); nBox.position.x=0.74; magG.add(nBox);
+const sBox=new THREE.Mesh(new THREE.BoxGeometry(1.45,0.92,L*0.99+0.04),sMat); sBox.position.x=-0.74; magG.add(sBox);
+function letterSprite(t,col,size=0.8){ const c=document.createElement('canvas'); c.width=c.height=128; const g=c.getContext('2d'); g.font='900 96px '+FONT; g.textAlign='center'; g.textBaseline='middle'; g.lineWidth=10; g.strokeStyle='rgba(0,0,0,.6)'; g.strokeText(t,64,70); g.fillStyle=col; g.fillText(t,64,70);
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),transparent:true,depthTest:true})); sp.scale.set(size,size,1); return sp; }
+const spN=letterSprite('N','#fff'); spN.position.set(0.8,0,L/2+0.1); rotorG.add(spN);
+const spS=letterSprite('S','#fff'); spS.position.set(-0.8,0,L/2+0.1); rotorG.add(spS);
+const shaftMat=new THREE.MeshStandardMaterial({color:0xcbd5e1,metalness:0.8,roughness:0.25,transparent:true,opacity:1});
+const shaft=new THREE.Mesh(new THREE.CylinderGeometry(0.22,0.22,L/2+0.6-WZ,24).rotateX(Math.PI/2),shaftMat); shaft.position.z=(L/2+0.6+WZ)/2; scene.add(shaft);
+// wheel
+const wheelG=new THREE.Group(); wheelG.position.z=WZ; scene.add(wheelG);
+const tireMat=new THREE.MeshStandardMaterial({color:0x111827,roughness:0.9,transparent:true,opacity:1});
+wheelG.add(new THREE.Mesh(new THREE.TorusGeometry(1.55,0.45,16,60),tireMat));
+const rimMat=new THREE.MeshStandardMaterial({color:0x9ca3af,metalness:0.8,roughness:0.3,transparent:true,opacity:1});
+const rim=new THREE.Mesh(new THREE.CylinderGeometry(1.15,1.15,0.25,40).rotateX(Math.PI/2),rimMat); wheelG.add(rim);
+for(let k=0;k<5;k++){ const sp=new THREE.Mesh(new THREE.BoxGeometry(0.16,1.25,0.32),new THREE.MeshStandardMaterial({color:0x4b5563,metalness:0.6,roughness:0.4})); const a=k*Math.PI*2/5; sp.position.set(Math.cos(a)*0.6,Math.sin(a)*0.6,0.05); sp.rotation.z=a-Math.PI/2; wheelG.add(sp); }
+// gap ring
+const gapMat=new THREE.MeshBasicMaterial({color:0xfde047,transparent:true,opacity:0,side:THREE.DoubleSide,depthWrite:false});
+const gapRing=new THREE.Mesh(new THREE.RingGeometry(RR,RI,72),gapMat); gapRing.position.z=L/2+0.03; scene.add(gapRing);
+
+/* electromagnet ghost poles */
+const emG=new THREE.Group(); scene.add(emG);
+function poleMesh(col){ const g=new THREE.CylinderGeometry(RI-0.04,RI-0.04,L*1.02,40,1,true,Math.PI/2-rad(32),rad(64)).rotateX(Math.PI/2);
+  return new THREE.Mesh(g,new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:0.4,side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending})); }
+const poleN=poleMesh(0xef4444), poleS=poleMesh(0x3b82f6); poleS.rotation.z=Math.PI; emG.add(poleN); emG.add(poleS);
+
+/* arrows */
+function makeArrow(col,thick=0.09){ const g=new THREE.Group(); const m=new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:1,depthTest:false});
+  const sh=new THREE.Mesh(new THREE.CylinderGeometry(thick,thick,1,16),m); const hd=new THREE.Mesh(new THREE.ConeGeometry(thick*2.6,thick*6,20),m); g.add(sh); g.add(hd); g.userData={sh,hd,m,thick}; g.renderOrder=10; sh.renderOrder=10; hd.renderOrder=10; scene.add(g); return g; }
+const _up=new THREE.Vector3(0,1,0);
+function setArrow(g,from,to,alpha){ g.visible=alpha>0.01; if(!g.visible) return; g.userData.m.opacity=alpha; const d=new THREE.Vector3().subVectors(to,from); const len=d.length(); const hl=g.userData.thick*6;
+  g.position.copy(from); g.quaternion.setFromUnitVectors(_up,d.clone().normalize()); const sl=Math.max(0.01,len-hl); g.userData.sh.scale.set(1,sl,1); g.userData.sh.position.y=sl/2; g.userData.hd.position.y=sl+hl/2; }
+const resArrow=makeArrow(0xfde047,0.11), pullArrow=makeArrow(0x34d399), pushArrow=makeArrow(0xf87171), pmArrow=makeArrow(0xef4444,0.08), emArrow=makeArrow(0x3b82f6,0.08);
+const curArrows=[makeArrow(0xffffff,0.06),makeArrow(0xffffff,0.06)];
+/* right-hand rule rings */
+const ringG=new THREE.Group(); scene.add(ringG); const ringSets=[];
+for(const [ang,dir] of [[90,1],[-90,-1]]){ const set={rings:[],cones:[],dir,ang}; const cx=RW*Math.cos(rad(ang)), cy=RW*Math.sin(rad(ang));
+  for(const z of [-1.1,0,1.1]) for(const r of [0.38,0.62]){ const m=new THREE.MeshBasicMaterial({color:0xfde047,transparent:true,opacity:0,depthWrite:false}); const t=new THREE.Mesh(new THREE.TorusGeometry(r,0.022,8,48),m); t.position.set(cx,cy,z); ringG.add(t); set.rings.push(t);
+    for(let k=0;k<2;k++){ const c=new THREE.Mesh(new THREE.ConeGeometry(0.07,0.18,12),m); ringG.add(c); set.cones.push({c,r,z,cx,cy,k}); } }
+  ringSets.push(set); }
+
+/* ---------- camera / orbit ---------- */
+const cam={az:0.6,el:0.3,dist:15,tx:0,ty:0,tz:0};
+function placeCamera(c){ const ce=Math.cos(c.el); camera.position.set(c.tx+c.dist*Math.sin(c.az)*ce, c.ty+c.dist*Math.sin(c.el), c.tz+c.dist*Math.cos(c.az)*ce); camera.lookAt(c.tx,c.ty,c.tz); }
+// simple orbit for explore mode
+let dragging=null;
+glc.addEventListener('pointerdown',e=>{ if(mode.kind!=='explore') return; dragging={x:e.clientX,y:e.clientY,az:cam.az,el:cam.el}; glc.setPointerCapture(e.pointerId); });
+glc.addEventListener('pointermove',e=>{ if(!dragging) return; const k=0.008/(stageScale||1)*1; cam.az=dragging.az-(e.clientX-dragging.x)*k; cam.el=clamp(dragging.el+(e.clientY-dragging.y)*k,-1.3,1.3); });
+glc.addEventListener('pointerup',()=>dragging=null); glc.addEventListener('pointercancel',()=>dragging=null);
+glc.addEventListener('wheel',e=>{ if(mode.kind!=='explore') return; e.preventDefault(); cam.dist=clamp(cam.dist*(1+Math.sign(e.deltaY)*0.08),6,30); },{passive:false});
+
+/* ---------- labels (HTML, projected) ---------- */
+const labelBox=document.getElementById('labels'); const labelEls={};
+function label(key,text,col,pos,alpha=1){ let el=labelEls[key]; if(!el){ el=document.createElement('div'); el.className='lab'; labelBox.appendChild(el); labelEls[key]=el; }
+  if(el._t!==text){ el.textContent=text; el._t=text; } el.style.borderColor=col; el.style.color=col;
+  const v=pos.clone().project(camera); const x=(v.x+1)/2*1240, y=(1-v.y)/2*790; const on=alpha>0.01&&v.z<1&&x>-50&&x<1290&&y>-30&&y<820;
+  el.style.display=on?'block':'none'; if(on){ el.style.transform=`translate(${x.toFixed(1)}px,${y.toFixed(1)}px) translate(-50%,-50%)`; el.style.opacity=alpha; } el._used=true; }
+const V=(x,y,z)=>new THREE.Vector3(x,y,z); const PA=(r,a,z)=>V(r*Math.cos(rad(a)),r*Math.sin(rad(a)),z);
+
+/* ---------- apply state ---------- */
+const DEF={statorOp:1,explode:0,rotorOp:1,wheelOp:1,coils:1,regions:0,slotHL:0,gapHL:0,statorGlow:0,I:null,dots:0,rotorAngle:-90,em:null,result:0,rings:0,curArrows:0,pull:0,push:0,wobble:0,cancel:0,labels:{},hud:null,t:0};
+let lastT=null;
+function apply(st,T){
+  const dt=lastT===null?0:clamp(T-lastT,0,0.1); lastT=T;
+  statorG.position.z=st.explode*5.2;
+  stMat.opacity=st.statorOp; stMat.depthWrite=st.statorOp>0.95; stMesh.visible=st.statorOp>0.01;
+  glowMat.opacity=st.statorGlow*0.18;
+  slotHLMat.opacity=st.slotHL*0.85;
+  for(const b of bars){ const m=b.mesh.material; const v=st.I?st.I[b.reg.ph]*(b.reg.cap?1:-1)/300:0; const k=Math.max(st.regions,Math.min(1,Math.abs(v)*1.5)); m.color.copy(_copper).lerp(_phc[b.reg.ph],k*0.85); m.emissiveIntensity=(st.regions*0.25+Math.abs(v)*0.9)*st.coils; b.mesh.visible=st.coils>0.01; }
+  for(const ph of ['A','B','C']){ const p=pairs[ph]; const I=st.I?st.I[ph]/300:0; p.mat.opacity=st.coils; p.mat.emissiveIntensity=0.15+Math.max(st.regions*0.5,Math.abs(I)*1.0); p.phase+=I*dt*0.55;
+    p.dm.opacity=st.dots*Math.min(1,Math.abs(I)*1.6+0.0); p.dots.forEach((d,k)=>{ d.visible=p.dm.opacity>0.02; if(!d.visible) return; const u=((k/p.dots.length+p.phase)%1+1)%1; d.position.copy(p.curve.getPointAt(u)); }); }
+  roMat.opacity=st.rotorOp; roMat.depthWrite=st.rotorOp>0.95; nMat.opacity=sMat.opacity=Math.max(st.rotorOp,0)*1; roMesh.visible=st.rotorOp>0.01; magG.visible=st.rotorOp>0.01; spN.visible=spS.visible=st.rotorOp>0.3;
+  rotorG.rotation.z=rad(st.rotorAngle); wheelG.rotation.z=rad(st.rotorAngle);
+  tireMat.opacity=rimMat.opacity=st.wheelOp; wheelG.visible=st.wheelOp>0.01; shaft.visible=st.wheelOp>0.01||st.rotorOp>0.01; shaftMat.opacity=Math.max(st.wheelOp,st.rotorOp);
+  gapMat.opacity=st.gapHL*0.75;
+  const wob=st.wobble?(Math.sin(T*23)*14+Math.sin(T*37)*9)*st.wobble:0;
+  if(st.em&&st.em.alpha>0.01){ emG.visible=true; emG.rotation.z=rad(st.em.angle+wob); poleN.material.opacity=poleS.material.opacity=0.45*st.em.alpha; } else emG.visible=false;
+  const ea=st.em?st.em.angle:0, zf=L/2+0.25;
+  setArrow(resArrow,PA(RI*0.8,ea+180,zf),PA(RI*0.8,ea,zf),st.result*0.9);
+  const ra=st.rotorAngle;
+  setArrow(pullArrow,PA(RR*0.72,ra,zf+0.05),PA(RI*0.95,ra-62,zf+0.05),st.pull);
+  setArrow(pushArrow,PA(RI*0.95,ra+62,zf+0.05),PA(RR*0.72,ra,zf+0.05),st.push);
+  setArrow(pmArrow,PA(RR*0.35,ra+14,zf+0.1),PA(RI+0.35,ra+14,zf+0.1),st.cancel);
+  setArrow(emArrow,PA(RI+0.35,ra-14,zf+0.1),PA(RR*0.35,ra-14,zf+0.1),st.cancel);
+  setArrow(curArrows[0],PA(RI+SD+0.25,90,-L/2-0.3).add(V(0,0,0)),PA(RI+SD+0.25,90,L/2+0.9),st.curArrows);
+  setArrow(curArrows[1],PA(RI+SD+0.25,-90,L/2+0.3),PA(RI+SD+0.25,-90,-L/2-0.9),st.curArrows);
+  ringSets.forEach(set=>{ set.rings.forEach(r=>{ r.material.opacity=st.rings*0.85; r.visible=st.rings>0.01; });
+    set.cones.forEach(o=>{ o.c.visible=st.rings>0.01; if(!o.c.visible) return; const ph=T*1.4*set.dir+o.k*Math.PI+o.r*3; o.c.position.set(o.cx+o.r*Math.cos(ph),o.cy+o.r*Math.sin(ph),o.z); o.c.rotation.set(0,0,ph+(set.dir>0?0:Math.PI)); }); });
+  // labels
+  for(const k in labelEls) labelEls[k]._used=false;
+  const lb=st.labels||{}; const ez=statorG.position.z;
+  if(lb.stator) label('stator','고정자 (원통형)','#38bdf8',PA(RO+0.4,40,L/2+ez),lb.stator);
+  if(lb.rotor) label('rotor','회전자','#e2e8f0',PA(RR*0.9,200,L/2+0.2),lb.rotor);
+  if(lb.magnet) label('magnet','영구자석 (N 빨강 · S 파랑)','#fca5a5',PA(1.0,ra,L/2+0.3),lb.magnet);
+  if(lb.shaft) label('shaft','중심축','#e2e8f0',V(0,0.5,(L/2+WZ)/2-0.6),lb.shaft);
+  if(lb.wheel) label('wheel','바퀴','#e2e8f0',V(0,2.4,WZ),lb.wheel);
+  if(lb.gap) label('gap','약간의 틈','#fde047',PA((RR+RI)/2,-40,L/2+0.1),lb.gap);
+  if(lb.slot) label('slot','슬롯: 한쪽 밑면 → 다른 쪽 밑면','#fde047',PA(RI+0.2,128,-L/2+ez),lb.slot);
+  if(lb.regions) for(const r of REG){ const c='#'+PHC[r.ph].toString(16).padStart(6,'0'); label('reg'+r.n,r.n,c,PA(RO+0.45,r.a,L/2+ez),lb.regions); }
+  if(lb.em&&st.em){ label('emN','전자석 N','#f87171',PA(RI-0.45,st.em.angle+wob,L/2+0.4),lb.em); label('emS','전자석 S','#60a5fa',PA(RI-0.45,st.em.angle+180+wob,L/2+0.4),lb.em); }
+  if(lb.ringA){ label('ringA','⊙ 전류가 나옴 → 반시계','#fde047',PA(RW,90,L/2+0.9),lb.ringA); label('ringa','⊗ 전류가 들어감 → 시계','#fde047',PA(RW,-90,L/2+0.9),lb.ringA); }
+  if(lb.pull) { label('pull','인력 (당김)','#34d399',PA(RI*0.95,ra-70,zf),lb.pull); }
+  if(lb.push) { label('push','척력 (밀어냄)','#f87171',PA(RI*0.95,ra+70,zf),lb.push); }
+  if(lb.cancel){ label('cancel','방향 반대 → 상쇄','#fde047',PA(RI*0.55,ra,zf+0.3),lb.cancel); }
+  for(const k in labelEls) if(!labelEls[k]._used) labelEls[k].style.display='none';
+}
+
+/* ---------- HUD ---------- */
+const hud=document.getElementById('hud').getContext('2d');
+function drawHUD(st){ hud.setTransform(1,0,0,1,0,0); hud.clearRect(0,0,1240,790); const h=st.hud; if(!h) return;
+  if(h.type==='graph'){ graph3(hud,110,165,300,170,h.theta,{alpha:h.alpha??1,cursor:true});
+    const I=currentsAt(((h.theta%360)+360)%360); const [rx,ry]=resultant(I);
+    box(hud,40,350,410,118,{fill:'rgba(17,26,44,.92)',alpha:h.alpha??1});
+    [['A–a',I.A,C.A],['B–b',I.B,C.B],['C–c',I.C,C.Cc]].forEach(([n,v,col],i)=>{ const y=375+i*28; txt(hud,n,58,y+7,{size:18,weight:700,color:col}); box(hud,120,y-7,200,14,{fill:'#1f2937',stroke:null,r:7}); box(hud,120,y-7,200*Math.abs(v)/300,14,{fill:col,stroke:null,r:7}); txt(hud,(v>=0?'+':'−')+Math.abs(Math.round(v)),335,y+7,{size:18,weight:700}); });
+    txt(hud,'합성 세기 '+Math.round(Math.hypot(rx,ry))+' (일정)',245,462,{size:17,weight:700,align:'center',color:'#34d399'}); }
+  if(h.type==='fw'){ box(hud,940,20,280,250,{fill:'rgba(17,26,44,.92)'}); gauge(hud,1080,140,88,h.speed,{limit:{v:130,alpha:h.limit||0}});
+    box(hud,30,560,470,210,{fill:'rgba(17,26,44,.92)'});
+    [['배터리 전압',100,'#60a5fa'],['역기전력',h.emf,'#f87171'],['고정자에 흐르는 전류',Math.max(4,100-h.emf),'#34d399']].forEach(([n,v,col],i)=>{ const y=590+i*60; txt(hud,n,50,y,{size:20,weight:700,color:col}); box(hud,50,y+10,360,22,{fill:'#1f2937',stroke:null,r:11}); box(hud,50,y+10,360*clamp(v/100),22,{fill:col,stroke:null,r:11}); txt(hud,Math.round(v)+'%',420,y+28,{size:19,weight:700}); });
+    if(h.warn>0){ box(hud,380,20,480,52,{fill:'rgba(127,29,29,.9)',stroke:'#f87171',alpha:h.warn}); txt(hud,'⚠ 고정자의 자기장이 불안정!',620,55,{size:24,weight:900,align:'center',alpha:h.warn}); } }
+}
+
+/* ================= TOUR ================= */
+function th3(lt){ if(lt<15) return 0; if(lt<18) return 90*ease((lt-15)/3); if(lt<24) return 90; if(lt<34) return 90+270*ease((lt-24)/10); return 360+(lt-34)*75; }
+function spd4(lt){ if(lt<9) return 75*ease(lt/9); if(lt<42) return 130-55*Math.exp(-(lt-9)/5); return lerp(130-55*Math.exp(-33/5),195,ease((lt-42)/9)); }
+function weak4(lt){ return lt<37?1:lerp(1,0.45,ease((lt-37)/5)); }
+const ANG4=(()=>{ const a=[0]; let s=0; for(let i=1;i<=60*30;i++){ s+=spd4((i-0.5)/30)*2.4/30; a.push(s); } return a; })();
+const ang4=lt=>{ const f=clamp(lt*30,0,ANG4.length-1), i=Math.floor(f); return lerp(ANG4[i],ANG4[Math.min(i+1,ANG4.length-1)],f-i); };
+
+const TOUR=[
+ {title:'3D로 보는 영구자석 동기전동기',short:'시작',dur:12,
+  quote:'영구자석 동기전동기는 영구자석과 전류가 흐를 때만 자성을 띠는 전자석 사이의 인력과 척력을 이용하여 전기 에너지를 회전력으로 바꾸는 전기 자동차의 핵심 장치이다.',
+  bullets:[[0,'① 구성: 회전자 · 고정자 · 슬롯 · 전선 다발'],[0,'② 전류 → 자기장 → 전자석 형성'],[0,'③ 회전하는 자기장과 회전력'],[0,'④ 고속 주행: 역기전력과 제어'],[0,'드래그로 돌려 보는 “직접 탐색” 모드도 있어요']],
+  steps:[[0,'2026학년도 10월 고1 학평 국어 [11~14] 지문 속 전동기를 3D로 돌려 보며 살펴봅시다.']],
+  cam:[[0,{az:-0.9,el:0.32,dist:14,tz:-1.2}],[12,{az:0.9,el:0.32,dist:13.5,tz:-0.8}]],
+  state(lt){ const th=lt*55; return {I:currentsAt(th),dots:1,rotorAngle:-th,em:{angle:90-th,alpha:0.8},hud:null}; }},
+ {title:'구성: 회전자 · 고정자 · 슬롯 · 전선 다발',short:'① 구성',dur:48,
+  quote:'전동기에는 영구자석이 부착된 원형의 회전자가 자동차 바퀴와 연결된 중심축에 결합되어 있고, 회전자 바깥쪽에 약간의 틈을 두고 이를 감싸는 원통형의 고정자가 배치되어 있다.',
+  bullets:[[0,'고정자: 바깥쪽 원통, 움직이지 않음'],[9,'회전자: 영구자석 부착, 바퀴와 연결된 중심축에 결합'],[20,'회전자와 고정자 사이: 약간의 틈'],[29,'슬롯: 한쪽 밑면에서 다른 쪽 밑면까지, 수십 개, 일정한 간격'],[38,'6구역 → 마주 보는 구역끼리 한 쌍 = 하나의 전선 다발'],[42,'한 슬롯으로 들어간 전선은 마주 보는 슬롯으로 나옴']],
+  steps:[[0,'바깥쪽 원통이 고정자, 그 안에서 도는 원형 부분이 회전자예요. 고정자를 앞으로 빼서 속을 보여 줄게요.'],
+         [9,'회전자에는 영구자석(빨강 N, 파랑 S)이 붙어 있고, 바퀴와 연결된 중심축에 결합되어 있어요. 회전자가 돌면 바퀴도 함께 돌아요.'],
+         [20,'고정자를 다시 끼우면, 회전자 바깥쪽에 약간의 틈(노란 고리)을 두고 원통형 고정자가 감싸게 돼요.'],
+         [29,'고정자 안쪽에는 원통의 한쪽 밑면에서 다른 쪽 밑면까지 이어진 수십 개의 슬롯이 일정한 간격으로 파여 있어요.'],
+         [38,'슬롯을 여섯 구역으로 나누고, 마주 보는 구역끼리(A–a, B–b, C–c) 하나의 전선 다발로 감아요. 하얀 점을 따라가면, 한 슬롯으로 들어간 전선이 마주 보는 슬롯으로 나오는 게 보여요.']],
+  cam:[[0,{az:0.6,el:0.3,dist:15}],[6,{az:1.3,el:0.25,dist:18,tz:1.5}],[11,{az:2.35,el:0.28,dist:17,tz:-2}],[19,{az:2.35,el:0.28,dist:17,tz:-2}],[23,{az:0.0,el:0.04,dist:10.5}],[28,{az:0.0,el:0.04,dist:10.5}],[32,{az:0.5,el:0.38,dist:9.8}],[37,{az:0.5,el:0.38,dist:9.8}],[41,{az:0.85,el:0.5,dist:12}]],
+  state(lt){ const ex=lt<20?ease((lt-1.5)/4):1-ease((lt-20)/3); const rot=-90+(lt>9&&lt<20?(lt-9)*30:(lt>=20?330:0));
+    const slot=lt>29?fin(lt,29.5,1)*(lt<38?1:fout(lt,40,1)):0; const reg=lt>38?fin(lt,38.3,1):0;
+    return {explode:ex,rotorAngle:rot,statorOp:lt>29?lerp(1,0.3,fin(lt,29,1)):1,rotorOp:lt>29?lerp(1,0.25,fin(lt,29,1)):1,slotHL:slot,regions:reg,gapHL:lt>20&&lt<29?fin(lt,22,0.8)*fout(lt,28,0.8):0,
+      statorGlow:lt<9?fin(lt,0.5,0.8)*fout(lt,8,0.8):0, I:lt>40?{A:300,B:0,C:0}:null, dots:lt>40?fin(lt,40,0.8):0, coils:1,
+      labels:{stator:lt<9?fin(lt,0.5,0.6):0,rotor:lt<9?fin(lt,4,0.6):0,magnet:lt>9&&lt<20?fin(lt,9.3,0.6):0,shaft:lt>9&&lt<20?fin(lt,11,0.6):0,wheel:lt>9&&lt<20?fin(lt,12,0.6):0,gap:lt>21&&lt<29?fin(lt,22,0.6):0,slot:lt>30&&lt<38?fin(lt,30.5,0.6):0,regions:reg}}; }},
+ {title:'전류와 자기장의 상호 작용 → 전자석 형성',short:'② 전자석 형성',dur:46,
+  quote:'전선 다발을 따라 전류가 고정자에서 밖으로 나오는 구역의 자기장은 반시계 방향으로, 전류가 고정자의 안으로 들어가는 구역의 자기장은 시계 방향으로 형성된다. … 자기장이 나가는 방향은 N극, 들어오는 방향은 S극을 띠는 전자석이 만들어진다.',
+  bullets:[[0,'가속 신호 → 제어 시스템이 배터리 전류를 특정 구역의 전선 다발로'],[10,'오른나사 법칙: 엄지 = 전류, 네 손가락 = 자기장'],[22,'⊙ 나오는 구역(A): 반시계 / ⊗ 들어가는 구역(a): 시계'],[31,'반대 방향 자기장이 마주함 → 한 방향의 자기장'],[38,'나가는 쪽 N극, 들어오는 쪽 S극 = 눈에 보이지 않는 전자석']],
+  steps:[[0,'자동차가 가속 신호를 받으면, 제어 시스템이 배터리의 전류를 특정 구역(A–a)의 전선 다발에 흘려보내요. 하얀 점이 전류의 흐름이에요.'],
+         [10,'A 구역에서는 전류가 고정자 앞쪽 밖으로 나오고(흰 화살표), a 구역에서는 고정자 안으로 들어가요. 오른나사 법칙에 따라 전선 다발 둘레에 자기장(노란 고리)이 생겨요.'],
+         [22,'앞에서 보면, 전류가 나오는 A 구역의 자기장은 반시계 방향, 전류가 들어가는 a 구역의 자기장은 시계 방향으로 돌아요.'],
+         [31,'방향이 반대인 두 자기장이 고정자 표면에서 마주하면, 그 사이에 한쪽으로 향하는 자기장(노란 화살표)이 만들어져요.'],
+         [38,'자기장이 나가는 쪽은 N극, 들어오는 쪽은 S극! 회전자 쪽 고정자 표면에 눈에 보이지 않는 전자석(빨강·파랑 빛)이 생겨요.']],
+  cam:[[0,{az:0.8,el:0.42,dist:12}],[9,{az:0.8,el:0.42,dist:12}],[13,{az:1.05,el:0.22,dist:10.5}],[21,{az:1.05,el:0.22,dist:10.5}],[25,{az:0,el:0.02,dist:9.4}],[37,{az:0,el:0.02,dist:9.4}],[42,{az:0.4,el:0.22,dist:10.5}]],
+  state(lt){ return {statorOp:0.28,rotorOp:0,wheelOp:0.25,I:{A:300,B:0,C:0},dots:1,rings:lt>10?fin(lt,10.5,1):0,curArrows:lt>10&&lt<31?fin(lt,10.5,0.8)*fout(lt,30,0.8):0,result:lt>31?fin(lt,31.5,1):0,em:lt>38?{angle:0,alpha:fin(lt,38.5,1)}:null,
+      labels:{ringA:lt>22&&lt<38?fin(lt,22.5,0.6):0,em:lt>38?fin(lt,39,0.6):0,regions:fin(lt,0.5,0.6)}}; }},
+ {title:'회전하는 자기장의 형성과 바퀴의 회전력 제어',short:'③ 회전 자기장',dur:58,
+  quote:'일정한 주기로 각 구역에 형성된 자기장들의 방향과 세기가 순차적으로 변하면서 마치 하나의 전자석이 회전하는 것과 같은 효과가 나타난다.',
+  bullets:[[0,'직류 → 교류, 세 쌍의 구역에 시간차를 두고 공급'],[9,'t₀: A–a 전류 0 → B–b, C–c 자기장만으로 전자석'],[15,'t₁: 한 구역 최대, 나머지 둘은 절반 → 전체 세기 일정'],[24,'방향·세기가 차례로 변함 → 전자석이 회전하는 효과'],[34,'영구자석 N극의 90° 앞: 전자석 S극(인력), 뒤: 전자석 N극(척력)'],[46,'회전자 → 중심축 → 바퀴에 최대한의 동력']],
+  steps:[[0,'제어 시스템은 배터리의 직류를 방향과 세기가 주기적으로 변하는 교류로 바꿔, 세 쌍의 구역에 각각 시간차를 두고 공급해요.'],
+         [9,'t₀: A–a 구역의 전류는 0이에요. 이때 전자석은 B–b와 C–c 구역의 자기장만으로 만들어져요.'],
+         [15,'t₁: A–a 전류가 가장 셀 때(300), B–b와 C–c는 각각 그 절반(150)이에요. 학습지 (나) 그림과 같은 순간이죠. 전체 자기장 세기는 일정하게 유지돼요.'],
+         [24,'각 구역 자기장의 방향과 세기가 차례로 바뀌면서, 마치 하나의 전자석이 빙글빙글 회전하는 것처럼 보여요.'],
+         [34,'제어 시스템은 영구자석 N극이 도는 방향으로 90° 앞선 곳에 전자석의 S극을 만들어 당기고(초록), 뒤쪽 N극으로 밀어내요(빨강).'],
+         [46,'당기고 미는 힘으로 회전자가 돌고, 중심축으로 연결된 바퀴에 최대한의 동력이 전달돼요.']],
+  cam:[[0,{az:0.7,el:0.35,dist:12.5,tx:-1.2}],[8,{az:0.7,el:0.35,dist:12.5,tx:-1.2}],[11,{az:0,el:0.02,dist:10.6,tx:-1.6}],[23,{az:0,el:0.02,dist:10.6,tx:-1.6}],[27,{az:0.3,el:0.18,dist:11,tx:-1.4}],[33,{az:0.3,el:0.18,dist:11,tx:-1.4}],[36,{az:0,el:0.02,dist:10.6,tx:-1.6}],[45,{az:0,el:0.02,dist:10.6,tx:-1.6}],[50,{az:-1.0,el:0.3,dist:17,tz:-1.8}],[58,{az:-1.9,el:0.3,dist:17,tz:-1.8}]],
+  state(lt){ const th=th3(lt); return {statorOp:lt<46?0.5:lerp(0.5,1,fin(lt,46,2)),rotorOp:1,I:currentsAt(th),dots:1,rotorAngle:-th,em:{angle:90-th,alpha:lt>9?fin(lt,9.2,0.8):0},result:lt>9&&lt<34?fin(lt,9.2,0.8)*fout(lt,33.5,0.6):0,
+      pull:lt>34?fin(lt,34.5,0.8)*fout(lt,52,1):0,push:lt>34?fin(lt,36.5,0.8)*fout(lt,52,1):0,
+      hud:lt<46?{type:'graph',theta:th,alpha:fin(lt,0.5,0.6)*fout(lt,45.5,0.6)}:null,
+      labels:{regions:lt<46?1:0,em:lt>9&&lt<46?fin(lt,9.5,0.6):0,pull:lt>34&&lt<46?fin(lt,35,0.6):0,push:lt>36&&lt<46?fin(lt,37,0.6):0,wheel:lt>47?fin(lt,47.5,0.6):0}}; }},
+ {title:'고속 주행 시 역기전력의 증가와 이를 줄이는 제어',short:'④ 역기전력',dur:52,
+  quote:'제어 시스템은 영구자석에 전자석이 겹쳐져 영구자석의 N극과 전자석의 S극이 같은 방향에 놓이도록 전류를 제어한다. 이때 고정자 내부에서 자기장의 방향이 서로 반대가 되면서 영구자석의 자기장 에너지와 전자석의 자기장 에너지가 상쇄된다.',
+  bullets:[[0,'특정 속도 이상 → 회전자가 빠르게 회전'],[9,'영구자석 자기장 → 고정자 자기장 불안정 → 관성으로 역기전력 ↑'],[20,'역기전력이 배터리 전압 상쇄 → 전류 방해 → 속도 제한'],[29,'대책: 영구자석 N극과 전자석 S극을 같은 방향에'],[37,'자기장 방향 반대 → 자기장 에너지 상쇄 → 역기전력 ↓'],[44,'전류 원활 → 더 빠른 회전']],
+  steps:[[0,'자동차가 특정 속도 이상으로 달리면, 바퀴와 연결된 회전자도 아주 빠르게 회전해요.'],
+         [9,'빠르게 도는 영구자석의 자기장 때문에 고정자의 자기장이 불안정해지고(흔들리는 전자석), 안정된 자기장을 유지하려는 관성으로 역기전력이 커져요.'],
+         [20,'역기전력이 배터리 전압을 상쇄하기 시작하면 고정자에 흐르는 전류가 방해받아, 회전 속도에 제한이 생겨요.'],
+         [29,'이를 극복하려고 제어 시스템은 영구자석의 N극과 전자석의 S극이 같은 방향에 놓이도록(겹치도록) 전류를 제어해요.'],
+         [37,'그러면 고정자 내부에서 두 자기장의 방향이 서로 반대가 되어(빨강 ↔ 파랑 화살표) 자기장 에너지가 상쇄되고, 역기전력이 줄어들어요.'],
+         [44,'전류가 다시 원활하게 흘러, 전동기가 속도 제한을 넘어 더 빠르게 회전할 수 있어요!']],
+  cam:[[0,{az:0.55,el:0.3,dist:13.5,tx:-0.6}],[26,{az:0.55,el:0.3,dist:13.5,tx:-0.6}],[31,{az:0,el:0.02,dist:11.2,tx:-0.6}],[43,{az:0,el:0.02,dist:11.2,tx:-0.6}],[50,{az:0.6,el:0.3,dist:14,tx:-0.6}]],
+  state(lt){ const rot=-ang4(lt); const off=lt<29?90:lerp(90,180,ease((lt-29.5)/5)); const instab=lt<9?0:(lt<37?clamp((lt-9)/6):lerp(1,0.15,ease((lt-37)/5)));
+    const sp=spd4(lt), emf=sp/130*95*weak4(lt);
+    return {statorOp:0.55,rotorOp:1,I:null,dots:0,rotorAngle:rot,em:{angle:rot+off,alpha:1},wobble:instab*(lt<29?1:0.5),cancel:lt>37?fin(lt,37.5,0.8):0,
+      hud:{type:'fw',speed:sp,emf,limit:lt>20&&lt<44?fin(lt,20,0.6)*fout(lt,43,0.8):0,warn:lt>9&&lt<40?instab*fout(lt,39,0.8):0},labels:{em:fin(lt,0.5,0.6),cancel:lt>37?fin(lt,38,0.6):0}}; }},
+ {title:'한눈에 정리',short:'정리',dur:14,
+  quote:'그러면 전류가 다시 원활하게 흐르면서 전동기가 빠르게 회전할 수 있게 된다.',
+  bullets:[[0,'구성: 영구자석 회전자 + 슬롯과 전선 다발이 있는 고정자'],[2,'전자석 형성: 전류 → 오른나사 법칙 → N·S극'],[4,'회전력 제어: 3상 교류 → 회전하는 전자석 → 90° 앞에서 당기고 뒤에서 밂'],[6,'고속: 역기전력 ↑ → N극–S극 겹치는 제어로 상쇄'],[9,'아래 “직접 탐색”에서 마음대로 돌려 보세요!']],
+  steps:[[0,'지금까지 본 흐름: 구성 → 전자석 형성 → 회전하는 자기장 → 고속에서의 역기전력 제어. 아래 ‘직접 탐색’에서 직접 돌려 보세요!']],
+  cam:[[0,{az:0.6,el:0.3,dist:16,tz:-0.5}],[14,{az:2.2,el:0.35,dist:17,tz:-1}]],
+  state(lt){ const th=lt*60; return {I:currentsAt(th),dots:1,rotorAngle:-th,em:{angle:90-th,alpha:0.8}}; }}
+];
+const TSTART=[]; let TTOTAL=0; for(const s of TOUR){ TSTART.push(TTOTAL); TTOTAL+=s.dur; }
+function camAt(keys,lt){ let a=keys[0],b=keys[keys.length-1]; for(let i=0;i<keys.length-1;i++){ if(lt>=keys[i][0]&&lt<keys[i+1][0]){a=keys[i];b=keys[i+1];break;} } if(lt>=keys[keys.length-1][0]) a=b=keys[keys.length-1];
+  const u=a===b?0:ease((lt-a[0])/(b[0]-a[0])); const o={}; for(const k of ['az','el','dist','tx','ty','tz']) o[k]=lerp(a[1][k]||0,b[1][k]||0,u); return o; }
+
+/* ================= EXPLORE ================= */
+const EXPLORE={
+  '구조':{cap:'마우스(손가락)로 끌어 돌리고, 휠로 확대해 보세요. “분해 보기”로 고정자를 빼면 영구자석이 붙은 회전자와 중심축·바퀴가 보여요.',scene:1},
+  '전자석 형성':{cap:'A–a 구역에만 전류를 흘린 상태예요. 전류(하얀 점)가 나오는 A 구역 둘레엔 반시계, 들어가는 a 구역 둘레엔 시계 방향 자기장이 생기고, 그 사이에 전자석이 만들어져요.',scene:2},
+  '회전 자기장':{cap:'세 쌍의 구역에 시간차를 둔 교류가 흐르며 전자석(빨강 N · 파랑 S)이 회전하고, 영구자석이 90° 뒤에서 따라 돌아요. 속도를 바꿔 보세요.',scene:3},
+  '고속 · 역기전력':{cap:'속도를 올리면 역기전력이 커져 전류가 줄어들고, 130 근처에서 속도가 제한돼요. “약계자 제어”를 켜면 영구자석 N극과 전자석 S극이 겹쳐 역기전력이 줄어요.',scene:4}};
+const ex={name:'구조',theta:0,rot:0,speed:1,explode:0,statorOp:1,labels:true,fw:false,fwk:0,vel:60,clock:0};
+function exploreState(dt){ ex.clock+=dt; const n=ex.name; let st;
+  if(n==='구조'){ ex.rot+=dt*30*ex.speed; st={explode:ex.explode,statorOp:ex.statorOp,rotorAngle:-90-ex.rot,regions:0.6,labels:ex.labels?{stator:1,rotor:1,magnet:1,shaft:1,wheel:1,gap:ex.explode<0.1?1:0,regions:1}:{}}; }
+  else if(n==='전자석 형성'){ st={statorOp:Math.min(ex.statorOp,0.35),explode:0,rotorOp:0,wheelOp:0.25,I:{A:300,B:0,C:0},dots:1,rings:1,curArrows:1,result:1,em:{angle:0,alpha:1},labels:ex.labels?{ringA:1,em:1,regions:1}:{}}; }
+  else if(n==='회전 자기장'){ ex.theta+=dt*60*ex.speed; const th=ex.theta; st={statorOp:Math.min(ex.statorOp,0.55),explode:ex.explode,I:currentsAt(th),dots:1,rotorAngle:-th,em:{angle:90-th,alpha:1},pull:1,push:1,hud:{type:'graph',theta:th},labels:ex.labels?{regions:1,em:1,pull:1,push:1}:{}}; }
+  else { const target=ex.vel; ex.fwk+=((ex.fw?1:0)-ex.fwk)*Math.min(1,dt*1.5); const cap=lerp(130,200,ex.fwk); const sp=Math.min(target,cap); ex.speedNow=(ex.speedNow??0)+(sp-(ex.speedNow??0))*Math.min(1,dt*1.2); ex.rot+=dt*ex.speedNow*2.4;
+    const emf=ex.speedNow/130*95*lerp(1,0.45,ex.fwk); const instab=clamp((ex.speedNow-80)/40)*(1-ex.fwk*0.8);
+    st={statorOp:Math.min(ex.statorOp,0.55),rotorAngle:-ex.rot,em:{angle:-ex.rot+lerp(90,180,ex.fwk),alpha:1},wobble:instab,cancel:ex.fwk,hud:{type:'fw',speed:ex.speedNow,emf,limit:(!ex.fw&&target>130)?1:0,warn:instab},labels:ex.labels?{em:1,cancel:ex.fwk}:{}}; }
+  return Object.assign({},DEF,st); }
+
+/* ================= APP ================= */
+let stageScale=1; const stage=document.getElementById('stage'), stageBox=document.getElementById('stageBox');
+if(isRender) document.documentElement.classList.add('render');
+function fit(){ if(isRender){ stageScale=1; stage.style.transform='none'; return; } stageScale=stageBox.clientWidth/1920; stage.style.transform=`scale(${stageScale})`; }
+addEventListener('resize',fit); fit();
+const fade=document.createElement('div'); fade.style.cssText='position:absolute;inset:0;background:#0b1220;pointer-events:none;opacity:0'; document.getElementById('view').appendChild(fade);
+const $=id=>document.getElementById(id);
+const mode={kind:'tour'};
+const progEls=TOUR.map(s=>{ const d=document.createElement('div'); d.style.flex=String(s.dur); const i=document.createElement('i'); d.appendChild(i); $('prog').appendChild(d); return d; });
+let curScene=-1, curCap='', curKey='';
+function setPanel(sc,key){ if(curKey===key) return; curKey=key; $('quote').textContent='“'+sc.quote+'”'; $('bullets').innerHTML=sc.bullets.map(b=>`<li>${b[1].replace(/&/g,'&amp;').replace(/</g,'&lt;')}</li>`).join(''); }
+function setBullets(sc,lt){ const lis=$('bullets').children; let curIdx=-1; sc.bullets.forEach((b,k)=>{ if(lt>=b[0]) curIdx=k; });
+  [...lis].forEach((li,k)=>{ const t=sc.bullets[k][0]; li.classList.toggle('hide',lt<t); li.classList.toggle('cur',k===curIdx&&sc.bullets.some(x=>x[0]>0)); }); }
+function setText(id,v){ const e=$(id); if(e._v!==v){ e.textContent=v; e._v=v; } }
+function renderAt(Tg){
+  Tg=clamp(Tg,0,TTOTAL-0.001); let i=TOUR.length-1; for(let k=0;k<TOUR.length;k++){ if(Tg<TSTART[k]+TOUR[k].dur){ i=k; break; } }
+  const sc=TOUR[i], lt=Tg-TSTART[i];
+  const st=Object.assign({},DEF,sc.state(lt)); apply(st,Tg); placeCamera(camAt(sc.cam,lt)); renderer.render(scene,camera); drawHUD(st);
+  fade.style.opacity=String(Math.max(1-clamp(lt/0.6),clamp((lt-(sc.dur-0.45))/0.45)));
+  setText('badge',String(i)); setText('title',sc.title); setPanel(sc,'t'+i); setBullets(sc,lt);
+  let cap=sc.steps[0][1]; for(const s of sc.steps) if(lt>=s[0]) cap=s[1]; setText('captext',cap);
+  progEls.forEach((d,k)=>{ const f=clamp((Tg-TSTART[k])/TOUR[k].dur); d.firstChild.style.width=(f*100)+'%'; d.classList.toggle('on',k===i); });
+}
+window.renderAt=renderAt; window.TTOTAL=TTOTAL;
+function exploreFrame(dt){ const st=exploreState(dt); apply(st,ex.clock); placeCamera(cam); renderer.render(scene,camera); drawHUD(st); fade.style.opacity='0';
+  const sc=TOUR[EXPLORE[ex.name].scene]; setText('badge','3D'); setText('title','직접 탐색 · '+ex.name); setPanel(sc,'e'+ex.name); [...$('bullets').children].forEach(li=>{ li.classList.remove('hide'); li.classList.remove('cur'); });
+  setText('captext',EXPLORE[ex.name].cap); }
+if(!isRender){
+  let T=0, playing=false, last=null;
+  const fmt=s=>Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0');
+  TOUR.forEach((s,k)=>{ const b=document.createElement('button'); b.textContent=s.short; b.onclick=()=>{ toTour(); T=TSTART[k]+0.01; }; $('chips').appendChild(b); });
+  Object.keys(EXPLORE).forEach(n=>{ const b=document.createElement('button'); b.textContent=n; b.onclick=()=>toExplore(n); $('modes').appendChild(b); });
+  function toTour(){ mode.kind='tour'; document.documentElement.classList.remove('explore'); [...$('modes').children].forEach(x=>x.classList.remove('on')); lastT=null; }
+  function toExplore(n){ mode.kind='explore'; playing=false; $('play').textContent='▶ 재생'; ex.name=n; document.documentElement.classList.add('explore');
+    [...$('modes').children].forEach(x=>x.classList.toggle('on',x.textContent===n)); Object.assign(cam,{az:n==='구조'?1.15:0.6,el:0.3,dist:n==='구조'?19:12,tx:0,ty:0,tz:n==='구조'?0:0}); lastT=null; }
+  $('play').onclick=()=>{ if(mode.kind!=='tour') toTour(); playing=!playing; if(playing&&T>=TTOTAL-0.05) T=0; $('play').textContent=playing?'⏸ 일시정지':'▶ 재생'; };
+  $('seek').oninput=()=>{ toTour(); T=$('seek').value/1000*TTOTAL; lastT=null; };
+  $('s_speed').oninput=e=>ex.speed=+e.target.value; $('s_op').oninput=e=>ex.statorOp=+e.target.value; $('s_ex').oninput=e=>ex.explode=+e.target.value; $('s_vel').oninput=e=>ex.vel=+e.target.value;
+  $('b_fw').onclick=e=>{ ex.fw=!ex.fw; e.target.textContent='약계자 제어: '+(ex.fw?'켬':'끔'); e.target.classList.toggle('on',ex.fw); };
+  $('b_lab').onclick=e=>{ ex.labels=!ex.labels; e.target.textContent='라벨: '+(ex.labels?'켬':'끔'); e.target.classList.toggle('on',ex.labels); };
+  $('b_view').onclick=()=>Object.assign(cam,{az:0,el:0.02,dist:10.5,tx:0,ty:0,tz:0});
+  addEventListener('keydown',e=>{ if(e.code==='Space'&&!(e.target instanceof HTMLInputElement)){ e.preventDefault(); $('play').click(); } });
+  function loop(ts){ const dt=last==null?0:Math.min(0.1,(ts-last)/1000); last=ts;
+    if(mode.kind==='tour'){ if(playing){ T+=dt; if(T>=TTOTAL){ T=TTOTAL-0.01; playing=false; $('play').textContent='▶ 재생'; } } renderAt(T); $('seek').value=Math.round(T/TTOTAL*1000); $('time').textContent=fmt(T)+' / '+fmt(TTOTAL); }
+    else exploreFrame(dt);
+    requestAnimationFrame(loop); }
+  requestAnimationFrame(loop);
+}
+
+</script>
+</body>
+</html>
