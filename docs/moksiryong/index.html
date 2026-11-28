@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>「목시룡전」 장면으로 읽기 — 2026 10월 고1 학평 국어 [31~33]</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;background:#060a14;color:#e5e7eb;font-family:"Noto Sans KR","Noto Sans CJK KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif}
+  #wrap{max-width:1600px;margin:0 auto;padding:12px}
+  canvas{width:100%;height:auto;display:block;border-radius:10px;background:#0b1220}
+  #ui{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
+  button{background:#1e293b;color:#e5e7eb;border:1px solid #334155;border-radius:8px;padding:8px 14px;font:inherit;font-size:15px;cursor:pointer}
+  button:hover{background:#273449}
+  button.on{background:#0ea5e9;border-color:#0ea5e9;color:#04121f;font-weight:700}
+  #seek{flex:1;min-width:200px}
+  #time{font-variant-numeric:tabular-nums;font-size:14px;color:#94a3b8;min-width:110px;text-align:right}
+  #chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .render #ui,.render #chips,.render #note{display:none}
+  .render #wrap{padding:0;max-width:none}
+  .render canvas{border-radius:0}
+  #note{font-size:14px;color:#94a3b8;margin-top:10px;line-height:1.6}
+  #note a{color:#38bdf8}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="cv" width="1920" height="1080"></canvas>
+  <div id="ui">
+    <button id="play">▶ 재생</button>
+    <button id="prev">⏮ 이전 장면</button>
+    <button id="next">다음 장면 ⏭</button>
+    <input id="seek" type="range" min="0" max="1000" value="0">
+    <span id="time">0:00 / 0:00</span>
+  </div>
+  <div id="chips"></div>
+  <div id="note">스페이스바: 재생/일시정지 · ←/→: 5초 이동 · 장면 버튼으로 원하는 부분부터 볼 수 있어요. <a href="moksiryong.mp4">동영상(MP4) 내려받기</a></div>
+</div>
+<script>
+'use strict';
+const W = 1920, H = 1080;
+const FONT = '"Noto Sans KR","Noto Sans CJK KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif';
+const C = {
+  bg:'#0b1220', panel:'#121b2d', panel2:'#1a2640', line:'#2b3a57', text:'#e5e7eb', sub:'#94a3b8',
+  N:'#ef4444', S:'#3b82f6', field:'#fde047', A:'#fb923c', B:'#4ade80', Cc:'#c084fc',
+  accent:'#38bdf8', stator:'#4b5b74', statorDark:'#3a4860', rotor:'#2a3547', gold:'#fbbf24', good:'#34d399', bad:'#f87171'
+};
+const PH = {A:C.A, B:C.B, C:C.Cc};
+const D2R = Math.PI/180;
+const clamp = (x,a=0,b=1)=>Math.max(a,Math.min(b,x));
+const ease = t=>{t=clamp(t);return t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;};
+const fin = (lt,s,d=0.8)=>ease((lt-s)/d);
+const fout = (lt,s,d=0.8)=>1-ease((lt-s)/d);
+const lerp = (a,b,t)=>a+(b-a)*t;
+const P = (cx,cy,r,deg)=>[cx+r*Math.cos(deg*D2R), cy-r*Math.sin(deg*D2R)];
+const font = (sz,w=500)=>`${w} ${sz}px ${FONT}`;
+
+function txt(ctx,s,x,y,o={}){
+  const {size=28,color=C.text,align='left',base='alphabetic',weight=500,alpha=1}=o;
+  if(alpha<=0) return;
+  ctx.save(); ctx.globalAlpha*=alpha; ctx.font=font(size,weight); ctx.fillStyle=color;
+  ctx.textAlign=align; ctx.textBaseline=base; ctx.fillText(s,x,y); ctx.restore();
+}
+function wrap(ctx,s,maxW){
+  const out=[];
+  for(const para of s.split('\n')){
+    const words=para.split(' '); let line='';
+    for(const w of words){
+      const test=line?line+' '+w:w;
+      if(ctx.measureText(test).width<=maxW){line=test;continue;}
+      if(line) out.push(line);
+      if(ctx.measureText(w).width>maxW){ // break long word by chars
+        let cur='';
+        for(const ch of w){ if(ctx.measureText(cur+ch).width>maxW){out.push(cur);cur=ch;} else cur+=ch; }
+        line=cur;
+      } else line=w;
+    }
+    out.push(line);
+  }
+  return out;
+}
+function para(ctx,s,x,y,maxW,o={}){
+  const {size=26,lh=1.55,color=C.text,weight=400,alpha=1,align='left'}=o;
+  ctx.save(); ctx.font=font(size,weight);
+  const lines=wrap(ctx,s,maxW);
+  ctx.globalAlpha*=alpha; ctx.fillStyle=color; ctx.textAlign=align; ctx.textBaseline='top';
+  lines.forEach((l,i)=>ctx.fillText(l,x,y+i*size*lh));
+  ctx.restore();
+  return lines.length*size*lh;
+}
+function rr(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
+function arrow(ctx,x1,y1,x2,y2,o={}){
+  const {color='#fff',width=4,head=16,alpha=1,dash=null}=o;
+  if(alpha<=0) return;
+  const a=Math.atan2(y2-y1,x2-x1), len=Math.hypot(x2-x1,y2-y1);
+  const hh=Math.min(head,len*0.6);
+  ctx.save(); ctx.globalAlpha*=alpha; ctx.strokeStyle=color; ctx.fillStyle=color; ctx.lineWidth=width; ctx.lineCap='round';
+  if(dash) ctx.setLineDash(dash);
+  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2-Math.cos(a)*hh*0.8,y2-Math.sin(a)*hh*0.8); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.beginPath(); ctx.moveTo(x2,y2);
+  ctx.lineTo(x2-hh*Math.cos(a-0.45),y2-hh*Math.sin(a-0.45));
+  ctx.lineTo(x2-hh*Math.cos(a+0.45),y2-hh*Math.sin(a+0.45)); ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+// arc arrow in math degrees from a1 to a2 (direction follows sign of a2-a1)
+function arcArrow(ctx,cx,cy,r,a1,a2,o={}){
+  const {color='#fff',width=4,head=16,alpha=1}=o;
+  if(alpha<=0) return;
+  ctx.save(); ctx.globalAlpha*=alpha; ctx.strokeStyle=color; ctx.fillStyle=color; ctx.lineWidth=width; ctx.lineCap='round';
+  const dir=Math.sign(a2-a1)||1; const back=(head*0.8/r)/D2R*dir;
+  ctx.beginPath(); ctx.arc(cx,cy,r,-a1*D2R,-(a2-back)*D2R,dir>0); ctx.stroke();
+  const [ex,ey]=P(cx,cy,r,a2); const tang=(a2*D2R)+dir*Math.PI/2; // direction of motion (math)
+  const tx=Math.cos(tang), ty=-Math.sin(tang); const ang=Math.atan2(ty,tx);
+  ctx.beginPath(); ctx.moveTo(ex,ey);
+  ctx.lineTo(ex-head*Math.cos(ang-0.45),ey-head*Math.sin(ang-0.45));
+  ctx.lineTo(ex-head*Math.cos(ang+0.45),ey-head*Math.sin(ang+0.45)); ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+function badge(ctx,x,y,label,color,o={}){
+  const {r=24,alpha=1,dashed=false,size=26,fill=null}=o;
+  if(alpha<=0) return;
+  ctx.save(); ctx.globalAlpha*=alpha;
+  ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2);
+  ctx.fillStyle=fill||color; ctx.fill();
+  if(dashed){ctx.setLineDash([5,4]); ctx.strokeStyle='#fff'; ctx.lineWidth=2.5; ctx.stroke();}
+  ctx.restore();
+  txt(ctx,label,x,y+1,{size,weight:900,align:'center',base:'middle',alpha,color:'#fff'});
+}
+// symbols ⊙ / ⊗
+function curSym(ctx,x,y,r,out,o={}){
+  const {alpha=1,color='#fff',bg='#0b1220'}=o; if(alpha<=0) return;
+  ctx.save(); ctx.globalAlpha*=alpha; ctx.lineWidth=Math.max(2,r*0.16); ctx.strokeStyle=color; ctx.fillStyle=bg;
+  ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle=color;
+  if(out){ ctx.beginPath(); ctx.arc(x,y,r*0.28,0,Math.PI*2); ctx.fill(); }
+  else { const k=r*0.62; ctx.beginPath(); ctx.moveTo(x-k,y-k); ctx.lineTo(x+k,y+k); ctx.moveTo(x+k,y-k); ctx.lineTo(x-k,y+k); ctx.stroke(); }
+  ctx.restore();
+}
+// polyline helper with dash animation
+function poly(ctx,pts,o={}){
+  const {color=C.field,width=2.5,alpha=1,dash=null,offset=0}=o; if(alpha<=0||pts.length<2) return;
+  ctx.save(); ctx.globalAlpha*=alpha; ctx.strokeStyle=color; ctx.lineWidth=width; ctx.lineJoin='round'; ctx.lineCap='round';
+  if(dash){ctx.setLineDash(dash); ctx.lineDashOffset=offset;}
+  ctx.beginPath(); ctx.moveTo(pts[0][0],pts[0][1]); for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i][0],pts[i][1]); ctx.stroke();
+  ctx.restore();
+}
+function headAlong(ctx,pts,frac,o={}){
+  if(pts.length<4) return;
+  const {color=C.field,size=13,alpha=1}=o;
+  let total=0; const seg=[]; for(let i=1;i<pts.length;i++){const d=Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1]); seg.push(d); total+=d;}
+  let target=total*frac, i=0; while(i<seg.length-1&&target>seg[i]){target-=seg[i];i++;}
+  const a=pts[i], b=pts[i+1]; const t=seg[i]?target/seg[i]:0; const x=lerp(a[0],b[0],t), y=lerp(a[1],b[1],t);
+  const ang=Math.atan2(b[1]-a[1],b[0]-a[0]);
+  ctx.save(); ctx.globalAlpha*=alpha; ctx.fillStyle=color; ctx.beginPath();
+  ctx.moveTo(x+size*0.6*Math.cos(ang),y+size*0.6*Math.sin(ang));
+  ctx.lineTo(x-size*0.6*Math.cos(ang)+size*0.5*Math.cos(ang+Math.PI/2),y-size*0.6*Math.sin(ang)+size*0.5*Math.sin(ang+Math.PI/2));
+  ctx.lineTo(x-size*0.6*Math.cos(ang)-size*0.5*Math.cos(ang+Math.PI/2),y-size*0.6*Math.sin(ang)-size*0.5*Math.sin(ang+Math.PI/2));
+  ctx.closePath(); ctx.fill(); ctx.restore();
+}
+function box(ctx,x,y,w,h,o={}){
+  const {fill=C.panel2,stroke=C.line,r=14,alpha=1,lw=2}=o; if(alpha<=0) return;
+  ctx.save(); ctx.globalAlpha*=alpha; rr(ctx,x,y,w,h,r); if(fill){ctx.fillStyle=fill; ctx.fill();} if(stroke){ctx.strokeStyle=stroke; ctx.lineWidth=lw; ctx.stroke();} ctx.restore();
+}
+
+
+/* ================= 「목시룡전」 ILLUSTRATION KIT ================= */
+const HEADER_TAG='2026 10월 고1 학평 국어 [31~33] · 고전소설 「목시룡전」';
+const K={ryong:'#60a5fa', ho:'#fb923c', lady:'#f9a8d4', villain:'#c084fc', emp:'#fcd34d', paper:'#fbf5e6', ink:'#2b2116', skin:'#f2cfa8'};
+let SEED=7; const rnd=()=>{SEED=(SEED*16807)%2147483647; return SEED/2147483647;};
+const STARS=(()=>{SEED=11; const a=[]; for(let i=0;i<90;i++) a.push([30+rnd()*1140,120+rnd()*360,rnd()*1.8+0.6,rnd()*6]); return a;})();
+
+const ROLES={
+  ryong:{robe:'#1e3a8a',hat:'samo',belt:'#e5c07b'},              // 한림 시룡
+  hoYoung:{robe:'#166534',hat:'samo',belt:'#e5c07b'},           // 벼슬하던 시호
+  general:{robe:'#991b1b',hat:'helmet',armor:true},              // 대원수 시호
+  monk:{robe:'#6b7280',hat:'bald',sash:'#9a3412'},               // 승려 시룡
+  oldmonk:{robe:'#78716c',hat:'bald',sash:'#b45309',beard:true,staff:true},
+  lady:{robe:'#9d174d',hat:'ladyhair',jacket:'#fbcfe8'},          // 윤부인
+  emperor:{robe:'#ca8a04',hat:'ikseon',emblem:true},
+  villain:{robe:'#4c1d95',hat:'samo',belt:'#a78bfa'},            // 엄숭
+  petty:{robe:'#374151',hat:'samo',belt:'#6b7280'},              // 소인
+  loyal:{robe:'#1f4e5f',hat:'samo',belt:'#e5c07b'},              // 충신
+  child:{robe:'#0e7490',hat:'kid'},
+  sick:{robe:'#a8a29e',hat:'top'}
+};
+function person(ctx,x,y,s,o={}){
+  const R=Object.assign({},ROLES[o.role||'ryong'],o);
+  const {face=1,alpha=1,bow=0,kneel=false,cry=0,t=0,tied=false,lying=false,glow=null,mouth=0}=R;
+  if(alpha<=0) return;
+  ctx.save(); ctx.globalAlpha*=alpha; ctx.translate(x,y);
+  if(lying){ ctx.rotate(-Math.PI/2*face); }
+  ctx.scale(s*face,s);
+  if(glow){ctx.save(); ctx.shadowColor=glow; ctx.shadowBlur=40;}
+  if(bow) ctx.rotate(bow*0.38);
+  const top=kneel?-96:-150, bw=kneel?62:50;
+  // robe
+  ctx.beginPath(); ctx.moveTo(-28,top); ctx.quadraticCurveTo(-46,top+(0-top)*0.55,-bw,0); ctx.lineTo(bw,0); ctx.quadraticCurveTo(46,top+(0-top)*0.55,30,top); ctx.closePath();
+  ctx.fillStyle=R.robe; ctx.fill(); ctx.lineWidth=2.5; ctx.strokeStyle='rgba(0,0,0,.35)'; ctx.stroke();
+  if(glow) ctx.restore();
+  if(R.jacket){ // lady: jacket over skirt
+    ctx.beginPath(); ctx.moveTo(-28,top); ctx.lineTo(30,top); ctx.lineTo(36,top+40); ctx.lineTo(-34,top+40); ctx.closePath(); ctx.fillStyle=R.jacket; ctx.fill();
+    ctx.strokeStyle='#be123c'; ctx.lineWidth=4; ctx.beginPath(); ctx.moveTo(8,top+24); ctx.lineTo(16,top+52); ctx.stroke();
+  }
+  if(R.armor){ ctx.strokeStyle='rgba(250,204,21,.55)'; ctx.lineWidth=2;
+    for(let r=0;r<5;r++) for(let c=-3;c<=3;c++){ const yy=top+24+r*20, xx=c*13+(r%2)*6; if(Math.abs(xx)>30+r*4) continue; ctx.beginPath(); ctx.arc(xx,yy,6,0,Math.PI); ctx.stroke(); }
+    ctx.fillStyle='#facc15'; ctx.fillRect(-36,top+(kneel?40:70),74,7);
+  }
+  if(R.belt){ ctx.fillStyle=R.belt; ctx.fillRect(-38,top+(kneel?38:62),78,6); }
+  if(R.emblem){ ctx.beginPath(); ctx.arc(4,top+38,15,0,Math.PI*2); ctx.fillStyle='#fde68a'; ctx.fill(); ctx.strokeStyle='#b45309'; ctx.lineWidth=2; ctx.stroke(); }
+  if(R.sash){ ctx.strokeStyle=R.sash; ctx.lineWidth=14; ctx.beginPath(); ctx.moveTo(-24,top+4); ctx.lineTo(32,top+(kneel?70:96)); ctx.stroke(); }
+  // collar
+  ctx.strokeStyle='#f8fafc'; ctx.lineWidth=4; ctx.beginPath(); ctx.moveTo(-10,top+1); ctx.lineTo(6,top+30); ctx.lineTo(20,top+1); ctx.stroke();
+  // sleeve (hands folded)
+  ctx.beginPath(); ctx.ellipse(16,top+(kneel?52:72),26,18,0.15,0,Math.PI*2); ctx.fillStyle=R.robe; ctx.fill(); ctx.strokeStyle='rgba(0,0,0,.3)'; ctx.lineWidth=2; ctx.stroke();
+  if(tied){ ctx.strokeStyle='#a16207'; ctx.lineWidth=5; for(const d of [26,54,82]){ if(top+d>-6) continue; ctx.beginPath(); ctx.moveTo(-44,top+d); ctx.lineTo(46,top+d+4); ctx.stroke(); } }
+  if(R.staff){ ctx.strokeStyle='#78350f'; ctx.lineWidth=6; ctx.beginPath(); ctx.moveTo(46,top-40); ctx.lineTo(46,0); ctx.stroke(); }
+  // head
+  const hx=4, hy=top-24;
+  ctx.fillStyle=K.skin; ctx.fillRect(-4,top-8,14,10);
+  ctx.beginPath(); ctx.arc(hx,hy,24,0,Math.PI*2); ctx.fillStyle=K.skin; ctx.fill(); ctx.strokeStyle='rgba(0,0,0,.25)'; ctx.lineWidth=2; ctx.stroke();
+  // hats / hair
+  const hat=R.hat;
+  if(hat==='samo'){ ctx.fillStyle='#111827'; ctx.beginPath(); ctx.arc(hx,hy-6,25,Math.PI,0); ctx.fill(); ctx.beginPath(); ctx.arc(hx-2,hy-24,15,Math.PI,0); ctx.fill();
+    rr(ctx,hx-46,hy-22,22,8,4); ctx.fill(); rr(ctx,hx+26,hy-22,22,8,4); ctx.fill(); }
+  else if(hat==='helmet'){ ctx.fillStyle='#7f1d1d'; ctx.beginPath(); ctx.arc(hx,hy-4,27,Math.PI,0); ctx.fill(); ctx.fillStyle='#facc15'; ctx.fillRect(hx-28,hy-6,56,6);
+    ctx.fillStyle='#7f1d1d'; ctx.fillRect(hx-30,hy-2,14,26);
+    ctx.fillStyle='#dc2626'; ctx.beginPath(); ctx.moveTo(hx,hy-30); ctx.quadraticCurveTo(hx-18,hy-62,hx-36,hy-44); ctx.quadraticCurveTo(hx-16,hy-42,hx-4,hy-28); ctx.fill();
+    ctx.fillStyle='#facc15'; ctx.beginPath(); ctx.arc(hx,hy-31,4,0,Math.PI*2); ctx.fill(); }
+  else if(hat==='ikseon'){ ctx.fillStyle='#111827'; ctx.beginPath(); ctx.arc(hx,hy-6,25,Math.PI,0); ctx.fill(); ctx.beginPath(); ctx.arc(hx,hy-22,16,Math.PI,0); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(hx-20,hy-40,8,13,-0.5,0,Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.ellipse(hx-6,hy-46,8,13,-0.2,0,Math.PI*2); ctx.fill(); }
+  else if(hat==='bald'){ ctx.fillStyle='rgba(255,255,255,.25)'; ctx.beginPath(); ctx.arc(hx-4,hy-12,10,0,Math.PI*2); ctx.fill(); }
+  else if(hat==='ladyhair'){ ctx.fillStyle='#111827'; ctx.beginPath(); ctx.arc(hx,hy-2,25,Math.PI*0.95,Math.PI*2.05); ctx.fill(); ctx.beginPath(); ctx.arc(hx-24,hy+6,11,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle='#facc15'; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(hx-40,hy+6); ctx.lineTo(hx-8,hy+6); ctx.stroke(); }
+  else if(hat==='kid'){ ctx.fillStyle='#111827'; ctx.beginPath(); ctx.arc(hx,hy-4,25,Math.PI,0); ctx.fill(); ctx.beginPath(); ctx.arc(hx-22,hy+2,8,0,Math.PI*2); ctx.fill(); }
+  else if(hat==='top'){ ctx.fillStyle='#292524'; ctx.beginPath(); ctx.arc(hx,hy-4,25,Math.PI,0); ctx.fill(); }
+  if(R.beard){ ctx.fillStyle='#f5f5f4'; ctx.beginPath(); ctx.moveTo(hx+2,hy+14); ctx.lineTo(hx+22,hy+12); ctx.lineTo(hx+10,hy+52); ctx.closePath(); ctx.fill();
+    ctx.fillRect(hx+8,hy-12,12,3); }
+  // face
+  ctx.strokeStyle='#1f2937'; ctx.fillStyle='#1f2937'; ctx.lineWidth=2.6;
+  if(cry>0){ ctx.beginPath(); ctx.arc(hx+12,hy-2,5,Math.PI*1.1,Math.PI*1.9); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(hx+6,hy-12); ctx.lineTo(hx+17,hy-9); ctx.stroke();
+    for(let k=0;k<3;k++){ const ph=((t*1.1+k/3)%1); ctx.save(); ctx.globalAlpha*=cry*(1-ph); ctx.fillStyle='#7dd3fc';
+      const ty=hy+2+ph*46; ctx.beginPath(); ctx.moveTo(hx+14,ty-6); ctx.quadraticCurveTo(hx+20,ty+2,hx+14,ty+4); ctx.quadraticCurveTo(hx+8,ty+2,hx+14,ty-6); ctx.fill(); ctx.restore(); }
+  } else { ctx.beginPath(); ctx.arc(hx+12,hy-3,3.2,0,Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.moveTo(hx+6,hy-11); ctx.lineTo(hx+17,hy-12); ctx.stroke(); }
+  if(mouth>0){ ctx.beginPath(); ctx.ellipse(hx+16,hy+11,3.5,3+mouth*3,0,0,Math.PI*2); ctx.fill(); }
+  else if(!R.beard){ ctx.beginPath(); ctx.moveTo(hx+11,hy+11); ctx.lineTo(hx+19,hy+10); ctx.stroke(); }
+  ctx.restore();
+  if(R.label){ ctx.save(); ctx.font=font(22,700); const w=ctx.measureText(R.label).width+24; ctx.restore();
+    const ly=lying?y+30:y+16;
+    box(ctx,x-w/2,ly,w,34,{fill:'rgba(15,23,42,.88)',stroke:R.labelColor||'#fff',r:17,alpha}); txt(ctx,R.label,x,ly+25,{size:22,weight:700,align:'center',color:R.labelColor||'#fff',alpha}); }
+}
+function bubble(ctx,x,y,w,text,o={}){
+  const {tail=null,size=25,who=null,whoColor='#334155',alpha=1,fill=K.paper,ink=K.ink,think=false}=o;
+  if(alpha<=0) return 0;
+  ctx.save(); ctx.font=font(size,500); const lines=wrap(ctx,text,w-36); ctx.restore();
+  const head=who?30:0, h=lines.length*size*1.45+28+head;
+  ctx.save(); ctx.globalAlpha*=alpha;
+  if(tail&&!think){ const bx=clamp(tail[0],x+30,x+w-30), by=tail[1]>y+h/2?y+h-2:y+2;
+    ctx.beginPath(); ctx.moveTo(bx-16,by); ctx.lineTo(tail[0],tail[1]); ctx.lineTo(bx+16,by); ctx.closePath(); ctx.fillStyle=fill; ctx.fill(); }
+  if(tail&&think){ for(let k=1;k<=3;k++){ const f=k/4; ctx.beginPath(); ctx.arc(lerp(tail[0],x+w/2,1-f*0.9),lerp(tail[1],y+h,1-f*0.9),4+k*3,0,Math.PI*2); ctx.fillStyle=fill; ctx.fill(); } }
+  rr(ctx,x,y,w,h,think?h/2.6:18); ctx.fillStyle=fill; ctx.shadowColor='rgba(0,0,0,.35)'; ctx.shadowBlur=14; ctx.fill(); ctx.shadowBlur=0;
+  if(think){ ctx.setLineDash([7,6]); ctx.strokeStyle='#94a3b8'; ctx.lineWidth=2; ctx.stroke(); ctx.setLineDash([]); }
+  ctx.restore();
+  if(who) txt(ctx,who,x+18,y+30,{size:21,weight:900,color:whoColor,alpha});
+  ctx.save(); ctx.globalAlpha*=alpha; ctx.font=font(size,500); ctx.fillStyle=ink; ctx.textBaseline='top';
+  lines.forEach((l,i)=>ctx.fillText(l,x+18,y+14+head+i*size*1.45)); ctx.restore();
+  return h;
+}
+function chip(ctx,x,y,text,color,o={}){ const {alpha=1,size=24,fill='rgba(15,23,42,.9)',align='left'}=o; if(alpha<=0) return 0;
+  ctx.save(); ctx.font=font(size,700); const w=ctx.measureText(text).width+34; ctx.restore();
+  const xx=align==='center'?x-w/2:x;
+  box(ctx,xx,y,w,size+22,{fill,stroke:color,r:(size+22)/2,alpha}); txt(ctx,text,xx+17,y+size+5,{size,weight:700,color,alpha}); return w; }
+function stamp(ctx,x,y,text,color,k){ if(k<=0) return; const s=lerp(1.8,1,ease(k));
+  ctx.save(); ctx.globalAlpha*=clamp(k*2); ctx.translate(x,y); ctx.rotate(-0.12); ctx.scale(s,s);
+  ctx.strokeStyle=color; ctx.lineWidth=6; rr(ctx,-90,-42,180,84,12); ctx.stroke(); ctx.restore();
+  ctx.save(); ctx.globalAlpha*=clamp(k*2); ctx.translate(x,y); ctx.rotate(-0.12); ctx.scale(s,s); txt(ctx,text,0,16,{size:44,weight:900,align:'center',color}); ctx.restore(); }
+
+/* ---------- backgrounds (scene area 30..1170 × 120..910) ---------- */
+function sky(ctx,c1,c2,y0=120,y1=910){ const g=ctx.createLinearGradient(0,y0,0,y1); g.addColorStop(0,c1); g.addColorStop(1,c2); ctx.fillStyle=g; ctx.fillRect(0,y0,1920,y1-y0); }
+function mountains(ctx,base,amp,col,seed,x0=0,x1=1200){ ctx.beginPath(); ctx.moveTo(x0,910); ctx.lineTo(x0,base);
+  for(let x=x0;x<=x1;x+=20){ const y=base-amp*(0.55+0.45*Math.sin(x/170+seed)*Math.cos(x/97+seed*2)); ctx.lineTo(x,y); } ctx.lineTo(x1,910); ctx.closePath(); ctx.fillStyle=col; ctx.fill(); }
+function pine(ctx,x,y,s,col='#14532d'){ ctx.fillStyle='#5b3a1e'; ctx.fillRect(x-4*s,y-60*s,8*s,60*s);
+  for(let k=0;k<3;k++){ ctx.beginPath(); ctx.ellipse(x+(k-1)*10*s,y-(70+k*26)*s,(44-k*9)*s,13*s,0,0,Math.PI*2); ctx.fillStyle=col; ctx.fill(); } }
+function roof(ctx,cx,y,w,h,col='#334155'){
+  ctx.beginPath(); ctx.moveTo(cx-w/2-34,y-22); ctx.quadraticCurveTo(cx-w/2+10,y+6,cx-w/2+60,y+4); ctx.lineTo(cx+w/2-60,y+4); ctx.quadraticCurveTo(cx+w/2-10,y+6,cx+w/2+34,y-22);
+  ctx.quadraticCurveTo(cx+w/2-36,y-h*0.45,cx+w/2-80,y-h); ctx.lineTo(cx-w/2+80,y-h); ctx.quadraticCurveTo(cx-w/2+36,y-h*0.45,cx-w/2-34,y-22); ctx.closePath();
+  ctx.fillStyle=col; ctx.fill(); ctx.fillStyle='rgba(0,0,0,.35)'; ctx.fillRect(cx-w/2+70,y-h-8,w-140,12);
+  ctx.strokeStyle='rgba(255,255,255,.08)'; ctx.lineWidth=2; for(let x=cx-w/2+70;x<cx+w/2-70;x+=16){ ctx.beginPath(); ctx.moveTo(x,y-h+4); ctx.lineTo(x+(x-cx)*0.08,y+2); ctx.stroke(); } }
+function hall(ctx,cx,base,w,h,o={}){ const {roofCol='#334155',pillar='#9f1239',wall='#e7d9b8',night=false}=o;
+  ctx.fillStyle=night?'#3b3222':wall; ctx.fillRect(cx-w/2+40,base-h,w-80,h);
+  ctx.fillStyle='#166534'; ctx.fillRect(cx-w/2+40,base-h,w-80,16);
+  for(let k=0;k<5;k++){ const x=cx-w/2+50+k*(w-100)/4; ctx.fillStyle=pillar; ctx.fillRect(x-9,base-h+16,18,h-16); }
+  if(night){ for(let k=0;k<4;k++){ const x=cx-w/2+50+(k+0.5)*(w-100)/4; ctx.fillStyle='rgba(253,224,71,.55)'; ctx.fillRect(x-40,base-h+40,80,h-70); ctx.strokeStyle='rgba(120,53,15,.8)'; ctx.lineWidth=2; for(let g=0;g<4;g++){ctx.beginPath(); ctx.moveTo(x-40+g*20,base-h+40); ctx.lineTo(x-40+g*20,base-30); ctx.stroke();} } }
+  roof(ctx,cx,base-h+2,w+40,h*0.55,roofCol);
+  ctx.fillStyle='#78716c'; ctx.fillRect(cx-w/2,base,w,22); }
+function bgPalace(ctx,dim=0){ sky(ctx,'#9ccbe8','#f3e7c9'); mountains(ctx,520,90,'#9db3a6',1); hall(ctx,600,700,900,260);
+  ctx.fillStyle='#d6c7a1'; ctx.fillRect(0,722,1200,190); ctx.strokeStyle='rgba(0,0,0,.08)'; for(let y=740;y<910;y+=28){ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(1200,y); ctx.stroke();}
+  if(dim>0){ ctx.fillStyle=`rgba(10,15,30,${dim})`; ctx.fillRect(0,120,1200,790); } }
+function throne(ctx,x,base){ ctx.fillStyle='#7c2d12'; ctx.fillRect(x-110,base-36,220,36); ctx.fillStyle='#b45309'; ctx.fillRect(x-80,base-170,160,140); ctx.fillStyle='#fbbf24'; ctx.fillRect(x-70,base-160,140,10); }
+function bgHome(ctx,lt,dim=0){ sky(ctx,'#bfe3f2','#f6edd3'); mountains(ctx,470,140,'#a7c4b5',0.3); mountains(ctx,560,120,'#6f9c86',2.1); mountains(ctx,660,80,'#4f7a63',4.2);
+  ctx.fillStyle='#8fb174'; ctx.fillRect(0,720,1200,190);
+  for(const [x,s] of [[90,1.1],[180,0.8],[1090,1.2],[1010,0.9]]) pine(ctx,x,760,s);
+  if(dim>0){ ctx.fillStyle=`rgba(40,40,50,${dim})`; ctx.fillRect(0,120,1200,790); } }
+function graves(ctx,x,y){ for(const [dx,s] of [[0,1],[150,0.85]]){ ctx.beginPath(); ctx.ellipse(x+dx,y,70*s,38*s,0,Math.PI,0); ctx.fillStyle='#4d7c0f'; ctx.fill(); ctx.fillStyle='#d6d3d1'; ctx.fillRect(x+dx-10*s,y-4,20*s,26*s); } }
+function bgStudy(ctx,night){ sky(ctx,night?'#1c1917':'#e9dcc0',night?'#292524':'#d8c7a3');
+  ctx.fillStyle=night?'#3f3a33':'#f5ecd7'; ctx.fillRect(170,190,520,330); ctx.strokeStyle='#7c5a3a'; ctx.lineWidth=6; ctx.strokeRect(170,190,520,330);
+  ctx.lineWidth=2.5; for(let x=170;x<=690;x+=52){ctx.beginPath(); ctx.moveTo(x,190); ctx.lineTo(x,520); ctx.stroke();} for(let y=190;y<=520;y+=55){ctx.beginPath(); ctx.moveTo(170,y); ctx.lineTo(690,y); ctx.stroke();}
+  if(night){ ctx.fillStyle='rgba(253,224,71,.12)'; ctx.fillRect(170,190,520,330); }
+  ctx.fillStyle=night?'#44301f':'#a47148'; ctx.fillRect(0,730,1200,180); }
+function lamp(ctx,x,y,lt){ const g=ctx.createRadialGradient(x,y-60,5,x,y-60,260); g.addColorStop(0,'rgba(253,224,71,.55)'); g.addColorStop(1,'rgba(253,224,71,0)'); ctx.fillStyle=g; ctx.fillRect(x-260,y-320,520,520);
+  ctx.fillStyle='#78350f'; ctx.fillRect(x-6,y-60,12,60); ctx.fillStyle='#fef3c7'; rr(ctx,x-22,y-110,44,52,8); ctx.fill(); ctx.fillStyle='#f59e0b'; ctx.beginPath(); ctx.ellipse(x,y-82+Math.sin(lt*9)*1.5,5,10,0,0,Math.PI*2); ctx.fill(); }
+function bgTempleNight(ctx,lt){ sky(ctx,'#0b1430','#25305a');
+  for(const [x,y,r,p] of STARS){ ctx.globalAlpha=0.5+0.5*Math.sin(lt*1.5+p); ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill(); } ctx.globalAlpha=1;
+  const mg=ctx.createRadialGradient(980,230,10,980,230,140); mg.addColorStop(0,'rgba(254,249,195,.9)'); mg.addColorStop(0.35,'rgba(254,249,195,.35)'); mg.addColorStop(1,'rgba(254,249,195,0)'); ctx.fillStyle=mg; ctx.fillRect(840,90,280,280);
+  ctx.beginPath(); ctx.arc(980,230,44,0,Math.PI*2); ctx.fillStyle='#fef9c3'; ctx.fill();
+  mountains(ctx,500,120,'#18213f',1.5); mountains(ctx,580,80,'#141b33',3.3);
+  hall(ctx,600,640,760,200,{roofCol:'#1e293b',pillar:'#5b1d2a',night:true});
+  ctx.fillStyle='#2a2f45'; ctx.fillRect(0,662,1200,250);
+  for(const x of [210,990]){ ctx.fillStyle='rgba(251,146,60,.25)'; ctx.beginPath(); ctx.arc(x,500,40,0,Math.PI*2); ctx.fill(); ctx.fillStyle='#fb923c'; rr(ctx,x-16,480,32,42,10); ctx.fill(); } }
+function altar(ctx,x,base,lt){ ctx.fillStyle='#5b3a1e'; ctx.fillRect(x-90,base-70,180,70); ctx.fillStyle='#7c4a24'; ctx.fillRect(x-100,base-80,200,14);
+  ctx.fillStyle='#a16207'; ctx.fillRect(x-14,base-110,28,30); for(let k=0;k<3;k++){ const ph=(lt*0.4+k/3)%1; ctx.strokeStyle=`rgba(226,232,240,${0.5*(1-ph)})`; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(x,base-112); ctx.bezierCurveTo(x+20*Math.sin(ph*6),base-140-ph*60,x-20*Math.sin(ph*5),base-170-ph*80,x+10,base-200-ph*100); ctx.stroke(); } }
+function bgHallIn(ctx,lt){ sky(ctx,'#3b2414','#5a3a20');
+  for(const x of [120,1080]){ ctx.fillStyle='#7f1d1d'; ctx.fillRect(x-24,120,48,620); }
+  ctx.fillStyle='#166534'; ctx.fillRect(0,120,1200,26); ctx.fillStyle='#7c2d12'; ctx.fillRect(0,146,1200,10);
+  // painting frame (관세음보살 화상, abstract)
+  const fx=900, fy=200; box(ctx,fx-120,fy,240,330,{fill:'#f5e9cc',stroke:'#a16207',r:6,lw:8});
+  const g=ctx.createRadialGradient(fx,fy+120,10,fx,fy+120,90); g.addColorStop(0,'rgba(253,224,71,.9)'); g.addColorStop(1,'rgba(253,224,71,0)'); ctx.fillStyle=g; ctx.fillRect(fx-110,fy+20,220,220);
+  ctx.fillStyle='#e7e5e4'; ctx.beginPath(); ctx.moveTo(fx-60,fy+300); ctx.quadraticCurveTo(fx,fy+150,fx+60,fy+300); ctx.fill(); ctx.beginPath(); ctx.arc(fx,fy+130,28,0,Math.PI*2); ctx.fillStyle='#f5d0a9'; ctx.fill();
+  ctx.fillStyle='#f9a8d4'; for(let k=-2;k<=2;k++){ ctx.beginPath(); ctx.ellipse(fx+k*22,fy+306,14,8,k*0.3,0,Math.PI*2); ctx.fill(); }
+  txt(ctx,'관세음보살 화상',fx,fy+372,{size:20,align:'center',color:'#fde68a',weight:700});
+  ctx.fillStyle='#4a2c17'; ctx.fillRect(0,740,1200,170); ctx.strokeStyle='rgba(0,0,0,.25)'; for(let x=0;x<1200;x+=60){ctx.beginPath(); ctx.moveTo(x,740); ctx.lineTo(x-40,910); ctx.stroke();}
+  altar(ctx,900,740,lt); }
+function bgDream(ctx,lt){ sky(ctx,'#2e1065','#6d28d9'); for(let k=0;k<6;k++){ const x=(k*230+lt*25)%1400-100, y=220+((k*97)%400); ctx.fillStyle='rgba(237,233,254,.12)'; ctx.beginPath(); ctx.ellipse(x,y,160,40,0,0,Math.PI*2); ctx.fill(); } }
+function bgDawn(ctx,k){ sky(ctx,`rgb(${lerp(30,251,k)|0},${lerp(41,191,k)|0},${lerp(80,132,k)|0})`,`rgb(${lerp(50,254,k)|0},${lerp(60,240,k)|0},${lerp(90,200,k)|0})`);
+  mountains(ctx,560,110,'#3b3f5c',2.2); hall(ctx,600,700,700,180,{roofCol:'#1e293b',pillar:'#7f1d1d'}); ctx.fillStyle='#3f3f46'; ctx.fillRect(0,722,1200,190); }
+function tree(ctx,x,base,bloom,lt){ ctx.strokeStyle='#4a2c17'; ctx.lineCap='round';
+  const br=(x1,y1,a,len,d)=>{ if(d===0||len<8) return; const x2=x1+Math.cos(a)*len, y2=y1-Math.sin(a)*len; ctx.lineWidth=d*3; ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+    if(d<=2&&bloom>0){ for(let k=0;k<3;k++){ const f=(k+1)/4, bx=lerp(x1,x2,f), by=lerp(y1,y2,f); const s=bloom*(7+((bx*7)%5)); ctx.fillStyle='#fce7f3'; for(let p=0;p<5;p++){ ctx.beginPath(); ctx.arc(bx+Math.cos(p*1.256)*s*0.6,by+Math.sin(p*1.256)*s*0.6,s*0.5,0,Math.PI*2); ctx.fill(); } ctx.fillStyle='#f472b6'; ctx.beginPath(); ctx.arc(bx,by,s*0.28,0,Math.PI*2); ctx.fill(); } }
+    br(x2,y2,a+0.45,len*0.72,d-1); br(x2,y2,a-0.5,len*0.68,d-1); };
+  br(x,base,Math.PI/2,150,6);
+  if(bloom>0.6){ for(let k=0;k<14;k++){ const ph=(lt*0.25+k/14)%1; const px=x-200+((k*137)%400)+Math.sin(lt+k)*30, py=base-380+ph*420; ctx.globalAlpha=(bloom-0.6)/0.4*(1-ph); ctx.fillStyle='#fbcfe8'; ctx.beginPath(); ctx.ellipse(px,py,6,4,ph*6,0,Math.PI*2); ctx.fill(); } ctx.globalAlpha=1; } }
+function scroll(ctx,x,y,w,h,alpha=1){ if(alpha<=0) return; ctx.save(); ctx.globalAlpha*=alpha; ctx.fillStyle='#f4e7c5'; ctx.shadowColor='rgba(0,0,0,.45)'; ctx.shadowBlur=20; ctx.fillRect(x,y,w,h); ctx.shadowBlur=0;
+  ctx.fillStyle='#7c4a24'; rr(ctx,x-14,y-12,w+28,20,8); ctx.fill(); rr(ctx,x-14,y+h-8,w+28,20,8); ctx.fill(); ctx.restore(); }
+function sadness(ctx,x,y,lt,a){ if(a<=0) return; for(let k=0;k<4;k++){ const ph=(lt*0.5+k/4)%1; ctx.save(); ctx.globalAlpha*=a*(1-ph); ctx.strokeStyle='#e2e8f0'; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(x,y,40+ph*260,Math.PI*1.15,Math.PI*1.85); ctx.stroke(); ctx.restore(); } }
+
+/* ================= SCENES ================= */
+const SCENES=[];
+// ---------- 0. INTRO ----------
+SCENES.push({ title:'「목시룡전」, 장면으로 읽기', short:'시작 · 인물', dur:27, full:true,
+  steps:[[0,'2026학년도 10월 고1 학평 국어 [31~33] 고전소설 「목시룡전」(작자 미상)을 장면으로 따라가 봅시다.'],
+         [8,'먼저 인물부터! 형 목시룡은 ‘한림’, 동생 목시호는 ‘원수’라고도 불려요. 호칭이 바뀌어도 같은 사람이에요.'],
+         [18,'윤부인은 시룡의 아내, 곧 시호의 형수예요. 엄숭은 형제를 모함하는 악인이고, 황제는 형제를 아끼는 임금이에요.']],
+  draw(ctx,lt){
+    const g=ctx.createRadialGradient(1420,470,40,1420,470,520); g.addColorStop(0,'#3a2f1b'); g.addColorStop(1,'#0b1220'); ctx.fillStyle=g; ctx.fillRect(0,114,1920,800);
+    ctx.beginPath(); ctx.arc(1420,430,230,0,Math.PI*2); ctx.fillStyle='rgba(254,243,199,.13)'; ctx.fill();
+    const a=fin(lt,0.2,1), t1=fout(lt,7.6,0.6);
+    if(lt<8.3){
+      txt(ctx,'2026학년도 10월 고1 전국연합학력평가 · 국어 [31~33]',110,290,{size:30,color:'#fbbf24',weight:700,alpha:a*t1});
+      txt(ctx,'「목시룡전」',100,400,{size:100,weight:900,alpha:a*t1});
+      txt(ctx,'작자 미상 · 고전소설',110,470,{size:36,color:C.sub,alpha:a*t1});
+      txt(ctx,'헤어진 형제가 다시 만나기까지',110,560,{size:40,weight:700,alpha:a*t1,color:'#fde68a'});
+    }
+    person(ctx,1300,780,1.25,{role:'ryong',face:1,alpha:a,label:'형 목시룡',labelColor:K.ryong});
+    person(ctx,1540,780,1.25,{role:'hoYoung',face:-1,alpha:a,label:'동생 목시호',labelColor:K.ho});
+    if(lt>8){
+      const cards=[
+        ['ryong','목시룡 (형)',K.ryong,'= 한림(한림학사). 엄숭의 모함으로 유배 → 황용사 승려'],
+        ['general','목시호 (동생)',K.ho,'= 원수(대원수). 고향 선산을 지키다 대원수가 됨'],
+        ['lady','윤부인',K.lady,'시룡의 아내 = 시호의 형수'],
+        ['villain','엄숭',K.villain,'권력을 탐한 간신. 형제를 모함한 악인'],
+        ['emperor','황제',K.emp,'형제의 충과 효를 인정하는 임금']];
+      cards.forEach(([role,name,col,desc],i)=>{ const b=fin(lt,8.4+i*1.6,0.6); const x=70+(i%2)*500, y=150+Math.floor(i/2)*190;
+        box(ctx,x,y,470,170,{alpha:b,fill:'#15203a',stroke:col});
+        ctx.save(); ctx.beginPath(); ctx.rect(x+8,y+8,120,154); ctx.clip(); person(ctx,x+66,y+250,0.82,{role,alpha:b}); ctx.restore();
+        txt(ctx,name,x+142,y+52,{size:30,weight:900,color:col,alpha:b});
+        ctx.save(); ctx.globalAlpha*=b; para(ctx,desc,x+142,y+70,310,{size:22,color:'#e2e8f0'}); ctx.restore(); });
+      const b=fin(lt,10.5,0.8);
+      box(ctx,570,530,470,170,{alpha:b,fill:'#3b2a0a',stroke:'#fbbf24'});
+      txt(ctx,'호칭 주의!',600,575,{size:30,weight:900,color:'#fbbf24',alpha:b});
+      txt(ctx,'‘한림’ = 시룡',600,625,{size:27,weight:700,color:K.ryong,alpha:b});
+      txt(ctx,'‘원수(元帥)’ = 시호',600,670,{size:27,weight:700,color:K.ho,alpha:b});
+    }
+  }});
+
+// ---------- 1. 충과 효, 형제의 이별 ----------
+SCENES.push({ title:'충(忠)과 효(孝)를 위한 형제의 이별', short:'① 충과 효, 이별', dur:43,
+  quote:'형은 충성으로서 황제를 돕고 아우인 저는 벼슬을 물러나 형수와 아내를 데리고 고향에 돌아가 부모의 묘 아래에 머물면서 산소를 돌보는 것이 좋을까 합니다.',
+  bullets:[[0,'시호의 제안: 형은 충(나라), 아우는 효(부모 산소)'],[12,'한림(시룡)이 옳다 하고 황제께 시호의 소원을 아룀'],[16,'황제: “충신은 효자의 집안에서 난다” → 허락'],[28,'시호: 윤부인과 고향으로, 선산을 정성껏 지킴'],[34,'문무겸전의 뜻 → 병서·육도삼략을 익힘 (스스로의 뜻)']],
+  steps:[[0,'어느 날 동생 시호가 말해요. “형은 충성으로 황제를 돕고, 아우인 저는 벼슬을 물러나 고향에서 부모님 산소를 돌보겠습니다.”'],
+         [6,'형은 나라에 대한 ‘충’을, 동생은 부모에 대한 ‘효’를 맡기로 한 거예요. 충과 효를 함께 이루기 위해 형제가 헤어지게 돼요.'],
+         [12,'형인 한림(시룡)이 옳다 하고 황성에 올라가 황제께 시호의 소원을 아뢰어요.'],
+         [16,'황제는 “충신은 원래 효자의 집안에서 난다고 했는데, 부모를 위하고자 하니 짐이 어찌 말리겠는가?” 하며 허락해요.'],
+         [28,'시호는 윤부인(형수)을 모시고 고향으로 돌아가 선산을 정성껏 지키고, 집안을 엄숙하게 다스려요.'],
+         [34,'또 문과 무를 함께 갖추려는 뜻으로 손자·오자 같은 병서와 육도삼략을 익혀요. 형의 권유가 아니라 스스로의 뜻이에요!']],
+  draw(ctx,lt){
+    if(lt<12.3){ const a=fout(lt,11.7,0.6); ctx.save(); ctx.globalAlpha*=a;
+      bgStudy(ctx,false);
+      person(ctx,390,830,1.35,{role:'ryong',face:1,label:'형 · 한림 시룡',labelColor:K.ryong});
+      person(ctx,810,830,1.35,{role:'hoYoung',face:-1,label:'동생 · 시호',labelColor:K.ho,mouth:lt<6?0.5+0.5*Math.sin(lt*12):0});
+      bubble(ctx,560,170,560,'“형은 충성으로서 황제를 돕고, 아우인 저는 벼슬을 물러나 고향에 돌아가 부모의 산소를 돌보는 것이 좋을까 합니다.”',{tail:[790,520],who:'시호',whoColor:'#c2410c',alpha:fin(lt,0.5,0.6)*fout(lt,6,0.5)});
+      const b=fin(lt,6.2,0.7);
+      for(const [x,ch,lab,col] of [[390,'忠','형: 나라에 충성',K.ryong],[810,'孝','동생: 부모님께 효도',K.ho]]){
+        ctx.save(); ctx.globalAlpha*=b; ctx.beginPath(); ctx.arc(x,300,78,0,Math.PI*2); ctx.fillStyle='rgba(15,23,42,.9)'; ctx.fill(); ctx.lineWidth=5; ctx.strokeStyle=col; ctx.stroke(); ctx.restore();
+        txt(ctx,ch,x,330,{size:84,weight:900,align:'center',color:col,alpha:b}); chip(ctx,x,395,lab,col,{alpha:b,align:'center'}); }
+      arrow(ctx,500,300,700,300,{color:'#fde68a',width:5,head:16,alpha:b}); arrow(ctx,700,300,500,300,{color:'#fde68a',width:5,head:16,alpha:b});
+      chip(ctx,600,252,'역할을 나눔','#92400e',{alpha:b,align:'center',size:20,fill:'rgba(255,251,235,.95)'});
+      ctx.restore(); return; }
+    if(lt<28.3){ const a=fin(lt,12.3,0.6)*fout(lt,27.7,0.6); ctx.save(); ctx.globalAlpha*=a;
+      bgPalace(ctx); throne(ctx,900,740);
+      person(ctx,900,710,1.15,{role:'emperor',face:-1,label:'황제',labelColor:K.emp});
+      person(ctx,430,840,1.25,{role:'ryong',face:1,bow:lt<16?0.5+0.5*Math.sin(clamp((lt-12.5)/1.5)*Math.PI):0.2,label:'한림(시룡)',labelColor:K.ryong});
+      bubble(ctx,120,170,560,'(시호가 벼슬을 물러나 고향에서 부모님 산소를 돌보고자 합니다.)',{tail:[450,560],who:'한림(시룡)',whoColor:'#1d4ed8',alpha:fin(lt,12.8,0.6)*fout(lt,16,0.5)});
+      bubble(ctx,330,170,620,'“충신은 원래 효자의 집안에서 난다고 했는데, 부모를 위하고자 하니 짐이 어찌 말리겠는가?”',{tail:[860,450],who:'황제',whoColor:'#a16207',alpha:fin(lt,16.3,0.6)});
+      stamp(ctx,640,520,'허락',  '#dc2626',clamp((lt-22)/0.6));
+      ctx.restore(); return; }
+    const a=fin(lt,28.3,0.6); ctx.save(); ctx.globalAlpha*=a;
+    bgHome(ctx,lt); graves(ctx,820,725);
+    txt(ctx,'고향 선산 (부모님 산소)',895,640,{size:24,weight:700,align:'center',color:'#1f2937'});
+    const wx=lerp(240,470,ease((lt-28.5)/4));
+    person(ctx,wx+120,850,1.15,{role:'hoYoung',face:1,label:'시호',labelColor:K.ho});
+    person(ctx,wx,850,1.05,{role:'lady',face:1,label:'윤부인(형수)',labelColor:K.lady});
+    if(lt>34){ const b=fin(lt,34.2,0.7);
+      scroll(ctx,170,180,560,300,b);
+      txt(ctx,'문무겸전(文武兼全)의 뜻',450,235,{size:30,weight:900,align:'center',color:K.ink,alpha:b});
+      txt(ctx,'文  +  武',450,300,{size:44,weight:900,align:'center',color:'#9a3412',alpha:b});
+      ['손자·오자 등 병서의 근본','몸을 민첩하게 하는 육도삼략','바람과 비를 부리는 기술'].forEach((s,i)=>txt(ctx,'· '+s,220,355+i*38,{size:23,color:K.ink,alpha:b*fin(lt,35+i*0.7,0.5)}));
+      chip(ctx,450,500,'형의 권유 ✗ → 스스로의 뜻 ○','#fbbf24',{alpha:fin(lt,38,0.6),align:'center'});
+    }
+    ctx.restore(); }
+});
+
+// ---------- 2. 위기와 엇갈림 ----------
+SCENES.push({ title:'위기와 엇갈림: 서로가 죽은 줄 알다', short:'② 위기와 엇갈림', dur:59,
+  quote:'지금 조정에는 소인이 가득하여 나라의 일은 시간이 갈수록 잘못되어 가니 이 형의 마음은 항상 칼날 위에 앉아 있는 느낌이고 우물가에 서 있는 아이의 심정이다.',
+  bullets:[[0,'한림(시룡): 나랏일로 동생과 만나지도, 소식도 전하지 못함'],[6,'㉠ 편지: 시룡 → 시호'],[14,'칼날 위 · 우물가의 아이 = 언제 화를 당할지 모르는 불안 (비유)'],[24,'조물주의 시기 → 충신들이 귀양 (“시룡인들 어찌 무사하겠는가?”)'],[32,'[중략] 엄숭의 모함 → 시룡 유배'],[39,'시호: 형이 죽은 줄 알고 투신 → 구출 → 대원수'],[47,'시룡: 동생이 죽은 줄 알고 황용사 승려가 됨']],
+  steps:[[0,'한편 한림(시룡)은 나랏일에 몸을 바쳐, 사랑하는 동생과 헤어진 뒤 자주 만나지도 소식을 전하지도 못해요.'],
+         [6,'시룡은 동생에게 ㉠ 편지를 보내요. “조정에는 소인이 가득하여… 이 형의 마음은 칼날 위에 앉아 있는 느낌이고 우물가에 서 있는 아이의 심정이다.”'],
+         [14,'칼날 위에 앉은 느낌, 우물가에 선 아이의 심정 → 언제 위험에 빠질지 모르는 불안을 빗댄 비유예요. 조정 상황에 대한 시룡 자신의 걱정이에요.'],
+         [24,'조물주가 시기하여 어진 충신들을 모두 먼 곳으로 귀양 보내니, 그런 분위기 속에서 시룡인들 어찌 무사하겠어요?'],
+         [32,'[중략 부분] 간신 엄숭의 모함으로 시룡은 유배를 떠나요.'],
+         [39,'형이 죽은 줄 안 시호는 강물에 몸을 던지지만 구출되고, 이후 대원수가 되어 역모를 꾀한 엄숭을 잡아요.'],
+         [47,'유배가 끝난 시룡은 동생이 죽은 줄 알고 황용사의 승려가 돼요.'],
+         [52,'이제 형제는 서로가 죽은 줄 알고 있어요. 독자만 둘 다 살아 있다는 걸 알지요. 그래서 뒤의 재회가 더 극적으로 느껴져요!']],
+  draw(ctx,lt){
+    if(lt<6.3){ const a=fout(lt,5.7,0.6); ctx.save(); ctx.globalAlpha*=a; bgStudy(ctx,true); lamp(ctx,820,740,lt);
+      ctx.fillStyle='#5b3a1e'; ctx.fillRect(470,690,300,50); person(ctx,400,830,1.3,{role:'ryong',face:1,kneel:true,bow:0.25,label:'한림(시룡)',labelColor:K.ryong});
+      ctx.fillStyle='#f4e7c5'; ctx.fillRect(520,676,160,16);
+      ctx.restore(); return; }
+    if(lt<14.3){ const a=fin(lt,6.3,0.6)*fout(lt,13.7,0.6); ctx.save(); ctx.globalAlpha*=a; bgStudy(ctx,true);
+      scroll(ctx,170,190,860,500,1);
+      txt(ctx,'㉠ 시룡이 동생 시호에게 보낸 글',600,250,{size:30,weight:900,align:'center',color:'#7c2d12'});
+      const lines=['“지금 조정에는 소인이 가득하여','나라의 일은 시간이 갈수록 잘못되어 가니','이 형의 마음은 항상 칼날 위에 앉아 있는 느낌이고','우물가에 서 있는 아이의 심정이다.”'];
+      lines.forEach((l,i)=>txt(ctx,l,600,330+i*70,{size:33,weight:500,align:'center',color:K.ink,alpha:fin(lt,7+i*1.2,0.6)}));
+      ctx.restore(); return; }
+    if(lt<24.3){ const a=fin(lt,14.3,0.6)*fout(lt,23.7,0.6); ctx.save(); ctx.globalAlpha*=a; ctx.fillStyle='#111a2c'; ctx.fillRect(0,120,1200,800);
+      // panel 1 blade
+      box(ctx,60,160,520,500,{fill:'#1a2640'}); txt(ctx,'칼날 위에 앉아 있는 느낌',320,215,{size:30,weight:900,align:'center',color:'#e2e8f0'});
+      const wob=Math.sin(lt*4)*0.05;
+      ctx.save(); ctx.translate(320,520); ctx.rotate(wob);
+      ctx.beginPath(); ctx.moveTo(-210,0); ctx.lineTo(190,-6); ctx.lineTo(230,4); ctx.lineTo(190,14); ctx.lineTo(-210,10); ctx.closePath(); const sg=ctx.createLinearGradient(0,-6,0,14); sg.addColorStop(0,'#f8fafc'); sg.addColorStop(1,'#64748b'); ctx.fillStyle=sg; ctx.fill();
+      ctx.fillStyle='#78350f'; ctx.fillRect(-270,-8,60,26); ctx.restore();
+      person(ctx,320,512,0.75,{role:'ryong',face:1,kneel:true,cry:0.0});
+      txt(ctx,'! !',380,370,{size:40,weight:900,color:'#f87171'});
+      // panel 2 well
+      box(ctx,620,160,520,500,{fill:'#1a2640'}); txt(ctx,'우물가에 서 있는 아이의 심정',880,215,{size:30,weight:900,align:'center',color:'#e2e8f0'});
+      ctx.fillStyle='#57534e'; ctx.beginPath(); ctx.ellipse(950,560,110,34,0,0,Math.PI*2); ctx.fill(); ctx.fillStyle='#0c0a09'; ctx.beginPath(); ctx.ellipse(950,556,80,22,0,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#78716c'; ctx.fillRect(840,560,220,60); ctx.beginPath(); ctx.ellipse(950,620,110,30,0,0,Math.PI); ctx.fill();
+      ctx.save(); ctx.translate(810,600); ctx.rotate(Math.sin(lt*3)*0.08); person(ctx,0,0,0.62,{role:'child',face:1}); ctx.restore();
+      const b=fin(lt,16,0.7);
+      box(ctx,160,700,880,150,{alpha:b,fill:'#3b2a0a',stroke:'#fbbf24'});
+      txt(ctx,'비유 → 언제 위험에 빠질지 모르는 불안',600,760,{size:32,weight:900,align:'center',color:'#fde68a',alpha:b});
+      txt(ctx,'소인이 가득한 조정의 상황에 대한 시룡의 걱정',600,815,{size:27,align:'center',color:'#fff',alpha:b});
+      ctx.restore(); return; }
+    if(lt<32.3){ const a=fin(lt,24.3,0.6)*fout(lt,31.7,0.6); ctx.save(); ctx.globalAlpha*=a; bgPalace(ctx,0.45);
+      for(let k=0;k<3;k++) person(ctx,170+k*120,840,1,{role:'petty',face:1,label:k===1?'소인':null,labelColor:'#cbd5e1'});
+      for(let k=0;k<3;k++){ const x=lerp(640,1250,clamp((lt-25-k*0.8)/6)); person(ctx,x+k*110,840,1,{role:'loyal',face:1,bow:0.15,label:k===0?'충신들 → 귀양':null,labelColor:'#a7f3d0'}); }
+      person(ctx,560,840,1.1,{role:'ryong',face:1,label:'한림(시룡)',labelColor:K.ryong,cry:0});
+      bubble(ctx,240,190,720,'“조물주가 시기하여 어진 충신을 다 먼 곳으로 귀양을 보내니, 그런 분위기 속에서 시룡인들 어찌 무사하겠는가?”',{alpha:fin(lt,25,0.6),who:'서술자',whoColor:'#475569'});
+      ctx.restore(); return; }
+    // timeline
+    const a=fin(lt,32.3,0.6); ctx.save(); ctx.globalAlpha*=a; ctx.fillStyle='#0f172a'; ctx.fillRect(0,120,1200,800);
+    txt(ctx,'[중략 부분 줄거리]',600,175,{size:28,weight:900,align:'center',color:'#fbbf24'});
+    const tracks=[{y:330,col:K.ryong,role:'ryong',name:'형 시룡',ev:[[32.6,'엄숭의 모함'],[35,'유배'],[47,'유배가 끝남'],[49,'황용사 승려']]},
+                  {y:600,col:K.ho,role:'hoYoung',name:'동생 시호',ev:[[39,'형이 죽은 줄 앎'],[41,'강물에 투신 → 구출'],[43,'대원수가 됨'],[45,'역모한 엄숭을 잡음']]}];
+    tracks.forEach(tr=>{
+      ctx.save(); ctx.beginPath(); ctx.rect(40,tr.y-150,140,150); ctx.clip(); person(ctx,110,tr.y+40,0.8,{role:tr.role}); ctx.restore();
+      txt(ctx,tr.name,110,tr.y+72,{size:24,weight:900,align:'center',color:tr.col});
+      tr.ev.forEach(([t,s],i)=>{ const b=fin(lt,t,0.6); const x=290+i*225;
+        if(i>0) arrow(ctx,x-106,tr.y,x-70,tr.y,{color:tr.col,width:4,head:12,alpha:b});
+        box(ctx,x-65,tr.y-40,180,80,{alpha:b,fill:'#1a2640',stroke:tr.col});
+        ctx.save(); ctx.globalAlpha*=b; ctx.font=font(23,700); const ls=wrap(ctx,s,165); ctx.restore();
+        ls.forEach((l,k)=>txt(ctx,l,x+25,tr.y+8-(ls.length-1)*14+k*28,{size:23,weight:700,align:'center',alpha:b})); });
+    });
+    const b=fin(lt,52,0.8);
+    bubble(ctx,330,700,300,'“동생은 죽었구나…”',{who:'시룡',whoColor:'#1d4ed8',alpha:b,think:true});
+    bubble(ctx,680,700,300,'“형은 죽었구나…”',{who:'시호',whoColor:'#c2410c',alpha:b,think:true});
+    chip(ctx,600,830,'서로가 죽은 줄 안다 → 재회의 극적 효과','#fbbf24',{alpha:fin(lt,54,0.6),align:'center',size:26});
+    ctx.restore(); }
+});
+
+// ---------- 3. 악인 처벌 ----------
+SCENES.push({ title:'악인 엄숭의 처벌', short:'③ 악인 처벌', dur:45,
+  quote:'역적 엄숭아. … 전혀 무죄한 내 형을 모함하여 먼 곳에 유배를 가게하고 또 가다가 죽게 하였으니 이는 나라의 역적이자 나의 끝없는 원수다. 내 스스로 너를 처치하리라.',
+  bullets:[[0,'“원수를 아직까지 살려두었으니” — 이때 원수는 원한의 대상(怨讐) = 엄숭'],[10,'황제: “그대의 마음대로 처리하라.”'],[16,'시호의 꾸짖음: 나라의 역적 + 형을 모함한 나의 원수'],[28,'처벌 = 국가 질서 회복 + 형제 이별에 대한 사적 원한 해소'],[35,'황제: 한림(시룡)을 불쌍히 여겨 ‘충열공’으로 품계를 올림 (죽은 줄 앎)']],
+  steps:[[0,'대원수 시호가 황제에게 아뢰어요. “제가 원수를 아직까지 살려 두었으니 어찌하면 좋겠습니까?” 여기서 ‘원수’는 원한의 대상(怨讐), 곧 엄숭이에요.'],
+         [10,'황제가 “그대의 마음대로 처리하라.” 하자, 시호는 엄숭을 묶어 궁중에 꿇어앉히고 크게 꾸짖어요.'],
+         [16,'“나라의 은혜를 배반하고 나라를 망하게 하였으며, 무죄한 내 형을 모함하여 유배 가게 하고 죽게 하였으니 나라의 역적이자 나의 끝없는 원수다!”'],
+         [28,'시호는 청용검으로 엄숭을 처단해요. 악인의 처벌은 나라의 질서를 회복하는 일이자, 형제를 갈라놓은 데 대한 개인적 원한을 푸는 일이에요.'],
+         [35,'황제는 한림(시룡)이 죽은 줄 알고 불쌍히 여겨, 품계를 올려 ‘충열공’이라 하고 시신을 고향으로 모셔 오라고 해요. 사실 시룡은 살아 있는데 말이죠!']],
+  draw(ctx,lt){
+    bgPalace(ctx); throne(ctx,960,740);
+    person(ctx,960,710,1.1,{role:'emperor',face:-1,label:'황제',labelColor:K.emp});
+    const faceHo=lt<14?1:-1;
+    person(ctx,640,850,1.25,{role:'general',face:faceHo,label:'대원수 시호',labelColor:K.ho,mouth:(lt>16&&lt<27)?0.5+0.5*Math.sin(lt*10):0});
+    const vk=fin(lt,10.5,0.8)*(lt<29?1:fout(lt,29.2,1));
+    person(ctx,290,850,1.15,{role:'villain',face:1,kneel:true,tied:true,alpha:vk,label:'엄숭',labelColor:K.villain});
+    if(lt<10.3){ const b=fin(lt,0.5,0.6)*fout(lt,9.8,0.5);
+      bubble(ctx,320,170,520,'“내가 원수를 아직까지 살려두었으니 어찌하면 좋겠습니까?”',{tail:[690,540],who:'시호',whoColor:'#c2410c',alpha:b});
+      const c=fin(lt,3,0.6)*fout(lt,9.8,0.5);
+      box(ctx,60,330,520,170,{alpha:c,fill:'rgba(15,23,42,.92)',stroke:'#fbbf24'});
+      txt(ctx,'동음이의어 ‘원수’',90,375,{size:27,weight:900,color:'#fbbf24',alpha:c});
+      txt(ctx,'元帥 : 군대의 최고 지휘관 → 시호',90,425,{size:24,weight:700,color:K.ho,alpha:c});
+      txt(ctx,'怨讐 : 원한의 대상 → 엄숭 (여기!)',90,470,{size:24,weight:700,color:K.villain,alpha:c}); }
+    if(lt>10.3&&lt<16.2) bubble(ctx,620,200,440,'“그대의 마음대로 처리하라.”',{tail:[930,450],who:'황제',whoColor:'#a16207',alpha:fin(lt,10.6,0.5)*fout(lt,15.8,0.4)});
+    if(lt>16&&lt<28.4){ bubble(ctx,140,160,860,'“역적 엄숭아. 나라의 은혜를 배반하고 … 나라를 망하게 하느냐? 또한 … 무죄한 내 형을 모함하여 먼 곳에 유배를 가게 하고 또 가다가 죽게 하였으니 이는 나라의 역적이자 나의 끝없는 원수다.”',{tail:[600,540],who:'시호',whoColor:'#c2410c',alpha:fin(lt,16.2,0.6)*fout(lt,28,0.4),size:24});
+      chip(ctx,120,520,'나라의 역적','#f87171',{alpha:fin(lt,20,0.5)}); chip(ctx,120,580,'형을 모함한 나의 원수','#fb923c',{alpha:fin(lt,23,0.5)}); }
+    if(lt>28.3&&lt<29.6){ const k=(lt-28.3)/1.3; ctx.save(); ctx.globalAlpha*=Math.sin(k*Math.PI); ctx.strokeStyle='#fff'; ctx.lineWidth=12; ctx.shadowColor='#bae6fd'; ctx.shadowBlur=30; ctx.beginPath(); ctx.arc(330,700,170,-2.4,-2.4+k*2.2); ctx.stroke(); ctx.restore(); }
+    if(lt>29.5&&lt<35.3){ const b=fin(lt,29.8,0.6)*fout(lt,35,0.4); chip(ctx,330,520,'청용검으로 처단','#e0f2fe',{alpha:b,align:'center',size:28});
+      box(ctx,90,180,1000,120,{alpha:b,fill:'rgba(15,23,42,.92)',stroke:'#fbbf24'});
+      txt(ctx,'악인 처벌의 의미',590,222,{size:26,weight:900,align:'center',color:'#fbbf24',alpha:b});
+      chip(ctx,330,240,'국가 질서의 회복','#4ade80',{alpha:b,align:'center'}); chip(ctx,850,240,'형제 이별에 대한 사적 원한 해소','#fb923c',{alpha:b,align:'center'}); }
+    if(lt>35){ const b=fin(lt,35.3,0.7);
+      scroll(ctx,150,190,560,250,b);
+      txt(ctx,'忠烈公 (충열공)',430,270,{size:44,weight:900,align:'center',color:'#7c2d12',alpha:b});
+      txt(ctx,'한림(시룡)의 품계를 올림',430,330,{size:26,weight:700,align:'center',color:K.ink,alpha:b});
+      txt(ctx,'“시체를 고향으로 모셔 오라”',430,375,{size:24,align:'center',color:K.ink,alpha:b});
+      person(ctx,320,850,1.05,{role:'monk',face:1,alpha:0.45*fin(lt,38,0.8),label:'(사실은 살아 있음)',labelColor:'#cbd5e1'});
+      chip(ctx,430,470,'인물은 모르고 독자는 아는 상황','#fbbf24',{alpha:fin(lt,39,0.6),align:'center'}); }
+  }});
+
+// ---------- 4. 나라의 위기 → 황용사로 ----------
+SCENES.push({ title:'나라의 위기, 황용사로 가는 길', short:'④ 황용사로', dur:35,
+  quote:'지금 들으니 전쟁 후에 백성들이 무수하게 병이 들어 죽는다 하니 이것은 약으로는 감당하지 못할 듯하다. 경은 짐을 대신하여 황용사에 가서 제를 올려라.',
+  bullets:[[0,'전쟁 후 백성들이 병들어 무수히 죽음 (나라의 위기)'],[6,'㉡ 황제의 명: “~듯하다” 추측 표현 → 문제의 심각성'],[14,'㉡ 명령 → 시호가 황용사로 이동 (공간적 배경 전환)'],[20,'시호: 윤씨 형수에게 편지만 보내고 바로 출발'],[28,'나라의 어려움이 형제 재회의 계기가 됨']],
+  steps:[[0,'그때 전쟁 뒤 전국에서 백성들이 병이 들어 무수히 죽어요.'],
+         [6,'황제가 원수(시호)를 불러 말해요. “이것은 약으로는 감당하지 못할 듯하다. 경은 짐을 대신하여 황용사에 가서 제를 올려라.” (㉡)'],
+         [14,'‘~듯하다’는 추측의 표현으로 상황의 심각성을 드러내요. 그리고 이 명령으로 시호가 황용사로 옮겨 가게 되지요.'],
+         [20,'나랏일이 많아 집에 들르지 못한 시호는 윤씨 형수에게 편지 한 장을 써 보내고, 그날 바로 황용사로 떠나요. 형수를 직접 만난 것은 아니에요!'],
+         [28,'결국 나라에 닥친 어려움이 형제가 다시 만나는 계기가 되는 셈이에요.']],
+  draw(ctx,lt){
+    if(lt<6.3){ const a=fout(lt,5.7,0.6); ctx.save(); ctx.globalAlpha*=a; bgHome(ctx,lt,0.45);
+      ctx.fillStyle='rgba(30,27,46,.7)'; for(let k=0;k<4;k++){ ctx.beginPath(); ctx.ellipse(250+k*240+Math.sin(lt+k)*20,250,170,50,0,0,Math.PI*2); ctx.fill(); }
+      for(let k=0;k<3;k++) person(ctx,360+k*230,860,0.9,{role:'sick',lying:true,face:1,cry:0.6,t:lt});
+      chip(ctx,600,380,'전쟁 후 백성들 사이에 퍼진 병','#fecaca',{align:'center',size:34}); ctx.restore(); return; }
+    if(lt<20.3){ const a=fin(lt,6.3,0.6)*fout(lt,19.7,0.6); ctx.save(); ctx.globalAlpha*=a; bgPalace(ctx); throne(ctx,920,740);
+      person(ctx,920,710,1.1,{role:'emperor',face:-1,label:'황제',labelColor:K.emp,mouth:lt<12?0.5+0.5*Math.sin(lt*10):0});
+      person(ctx,450,850,1.25,{role:'general',face:1,bow:lt>12?0.6:0,label:'원수(시호)',labelColor:K.ho});
+      bubble(ctx,200,165,780,'“전쟁 후에 백성들이 무수하게 병이 들어 죽는다 하니 이것은 약으로는 감당하지 못할 듯하다. 경은 짐을 대신하여 황용사에 가서 제를 올려라.”',{tail:[880,440],who:'황제 (㉡)',whoColor:'#a16207',alpha:fin(lt,6.5,0.6)});
+      const b=fin(lt,14,0.6); chip(ctx,120,400,'‘~듯하다’ = 추측 → 상황의 심각성','#fbbf24',{alpha:b}); chip(ctx,120,460,'명을 받들어 → 황용사로 이동','#4ade80',{alpha:fin(lt,16,0.6)});
+      ctx.restore(); return; }
+    const a=fin(lt,20.3,0.6); ctx.save(); ctx.globalAlpha*=a; ctx.fillStyle='#e9dcbc'; ctx.fillRect(0,120,1200,800);
+    ctx.strokeStyle='rgba(120,90,50,.25)'; for(let k=0;k<8;k++){ ctx.beginPath(); ctx.ellipse(600,520,120+k*70,60+k*40,0,0,Math.PI*2); ctx.stroke(); }
+    const P1=[240,640], P2=[930,560], P3=[420,280];
+    const node=(p,lab,col)=>{ ctx.beginPath(); ctx.arc(p[0],p[1],46,0,Math.PI*2); ctx.fillStyle='#fff8e7'; ctx.fill(); ctx.lineWidth=5; ctx.strokeStyle=col; ctx.stroke(); txt(ctx,lab,p[0],p[1]+86,{size:28,weight:900,align:'center',color:'#3b2a14'}); };
+    ctx.setLineDash([14,10]); ctx.strokeStyle='#92400e'; ctx.lineWidth=5; ctx.beginPath(); ctx.moveTo(P1[0],P1[1]); ctx.quadraticCurveTo(600,780,P2[0],P2[1]); ctx.stroke(); ctx.setLineDash([]);
+    node(P1,'황성','#dc2626'); node(P2,'황용사','#7c3aed'); node(P3,'고향 (윤씨 형수)','#16a34a');
+    txt(ctx,'宮',P1[0],P1[1]+14,{size:40,weight:900,align:'center',color:'#dc2626'}); txt(ctx,'寺',P2[0],P2[1]+14,{size:40,weight:900,align:'center',color:'#7c3aed'}); txt(ctx,'家',P3[0],P3[1]+14,{size:40,weight:900,align:'center',color:'#16a34a'});
+    const lk=clamp((lt-21)/2.5); if(lk>0&&lk<1){ const x=lerp(P1[0],P3[0],lk), y=lerp(P1[1],P3[1],lk)-Math.sin(lk*Math.PI)*60; box(ctx,x-28,y-18,56,36,{fill:'#fff',stroke:'#16a34a',r:4}); txt(ctx,'✉',x,y+10,{size:26,align:'center',color:'#16a34a'}); }
+    chip(ctx,330,420,'편지 한 장만 보냄','#15803d',{alpha:fin(lt,23.5,0.5),fill:'rgba(255,255,255,.92)',align:'center'});
+    const pk=ease((lt-24)/4); if(lt>24){ const u=pk, x=(1-u)*(1-u)*P1[0]+2*(1-u)*u*600+u*u*P2[0], y=(1-u)*(1-u)*P1[1]+2*(1-u)*u*780+u*u*P2[1];
+      person(ctx,x,y+20,0.55,{role:'general',face:1}); ctx.fillStyle='#dc2626'; ctx.fillRect(x+26,y-120,4,90); ctx.beginPath(); ctx.moveTo(x+30,y-120); ctx.lineTo(x+70,y-105); ctx.lineTo(x+30,y-90); ctx.fill(); }
+    chip(ctx,600,180,'공간 이동: 황성 → 황용사 (재회의 무대)','#7c3aed',{alpha:fin(lt,26,0.6),fill:'rgba(255,255,255,.92)',align:'center',size:26});
+    ctx.restore(); }
+});
+
+// ---------- 5. 황용사의 밤 ----------
+SCENES.push({ title:'황용사의 밤: 곁에 있어도 알아보지 못하다', short:'⑤ 황용사의 밤', dur:45,
+  quote:'원수가 그 승려의 목소리를 듣고 속으로 탄식하여 말하기를, “천하에 이같이 나의 형과 꼭 같은 목소리도 다 있구나. 형의 목소리와 정녕 꼭 같으나 한 번 죽었으니 어찌 이곳에 있을 수 있겠는가?”',
+  bullets:[[0,'원수(시호)가 제를 올리는 자리에 한림(승려 시룡)도 참석'],[8,'못 알아본 이유 ① 제사에 마음이 쏠림 ② 승려와 속세 사람 ③ 밤이라 얼굴을 못 봄'],[18,'시호: “형과 꼭 같은 목소리” → 그러나 죽었다고 생각'],[25,'서로 의심만 함'],[29,'제를 마친 뒤 각자 형제를 생각하며 눈물'],[37,'만날 수 없다고 여기는 상황에서도 계속되는 우애']],
+  steps:[[0,'황용사에 도착한 원수(시호)는 주위를 깨끗이 하고 정성껏 제를 올려요. 그 자리에 한림, 곧 승려가 된 시룡도 함께 참석했어요.'],
+         [8,'그러나 슬프게도 서로를 알아보지 못해요. 원수는 제사에 마음이 쏠려 있고, 승려와 속세 사람은 모습이 다르며, 밤이라 얼굴도 살필 수 없었거든요.'],
+         [18,'승려의 목소리를 들은 원수가 속으로 탄식해요. “형과 꼭 같은 목소리도 다 있구나. 하지만 형은 한 번 죽었으니 어찌 이곳에 있겠는가?”'],
+         [25,'밤이라 얼굴을 살피지 못하고, 서로 의심만 할 뿐이에요.'],
+         [29,'제를 마친 뒤 원수는 형을, 한림은 동생을 생각하며 각자 눈물을 흘려요.'],
+         [37,'서로 만날 수 없다고 생각하는 상황에서도 형제의 우애는 이어지고 있어요. 지문은 이를 ‘윤리와 기강’의 영향이라고 말해요.']],
+  draw(ctx,lt){
+    if(lt<29.3){ const a=fout(lt,28.7,0.6); ctx.save(); ctx.globalAlpha*=a; bgTempleNight(ctx,lt); altar(ctx,560,780,lt);
+      person(ctx,380,850,1.15,{role:'general',face:1,bow:0.35+0.25*Math.sin(lt*1.3),label:'원수(시호)',labelColor:K.ho});
+      for(let k=0;k<3;k++){ const x=800+k*130; person(ctx,x,850,1.05,{role:'monk',face:-1,label:k===1?'승려들':null,labelColor:'#e2e8f0',mouth:(k===1&&lt>18&&lt<24)?0.5+0.5*Math.sin(lt*10):0}); }
+      const hk=fin(lt,2,0.8); ctx.save(); ctx.globalAlpha*=hk*0.9; ctx.setLineDash([8,6]); ctx.strokeStyle=K.ryong; ctx.lineWidth=3; rr(ctx,860,590,140,290,20); ctx.stroke(); ctx.restore();
+      chip(ctx,930,540,'이 승려가 한림(시룡)!',K.ryong,{alpha:hk,align:'center',size:22});
+      if(lt>8&&lt<18.3){ const b=fout(lt,17.9,0.4);
+        const r=[['① 원수는 제사에만 마음이 쏠림','#fbbf24',8.3],['② 승려와 속세 사람 — 모습이 다름','#e2e8f0',10.3],['③ 밤이라 얼굴을 살필 수 없음','#a5b4fc',12.3]];
+        r.forEach(([s,c,t],i)=>chip(ctx,70,160+i*62,s,c,{alpha:b*fin(lt,t,0.5),size:26}));
+        ctx.save(); ctx.globalAlpha*=b*fin(lt,12.3,1)*0.55; const vg=ctx.createRadialGradient(600,700,80,600,700,600); vg.addColorStop(0,'rgba(0,0,0,0)'); vg.addColorStop(1,'rgba(0,0,10,1)'); ctx.fillStyle=vg; ctx.fillRect(0,120,1200,800); ctx.restore(); }
+      if(lt>18){ for(let k=0;k<3;k++){ const ph=(lt*0.8+k/3)%1; ctx.save(); ctx.globalAlpha*=fin(lt,18,0.5)*(1-ph)*(lt<25?1:fout(lt,25,0.6)); ctx.strokeStyle='#fde68a'; ctx.lineWidth=4; ctx.beginPath(); ctx.arc(900,650,30+ph*400,Math.PI*0.88,Math.PI*1.12); ctx.stroke(); ctx.restore(); }
+        bubble(ctx,90,160,600,'(속으로) “천하에 이같이 나의 형과 꼭 같은 목소리도 다 있구나. 형의 목소리와 정녕 꼭 같으나 한 번 죽었으니 어찌 이곳에 있을 수 있겠는가?”',{think:true,tail:[400,600],who:'원수(시호)',whoColor:'#c2410c',alpha:fin(lt,18.5,0.6),size:24}); }
+      if(lt>25){ const b=fin(lt,25.2,0.5); txt(ctx,'?',400,560,{size:70,weight:900,align:'center',color:'#fde68a',alpha:b}); txt(ctx,'?',930,560,{size:70,weight:900,align:'center',color:'#fde68a',alpha:b}); }
+      ctx.restore(); return; }
+    const a=fin(lt,29.3,0.6); ctx.save(); ctx.globalAlpha*=a; ctx.fillStyle='#0f172a'; ctx.fillRect(0,120,1200,800);
+    for(const [x0,role,name,col,dream,dcol] of [[40,'general','원수(시호)',K.ho,'ryong','형 시룡을 그리며'],[610,'monk','한림(시룡)',K.ryong,'hoYoung','동생 시호를 그리며']]){
+      ctx.save(); ctx.beginPath(); ctx.rect(x0,140,550,740); ctx.clip(); bgStudy(ctx,true); ctx.restore();
+      ctx.save(); ctx.beginPath(); ctx.rect(x0,140,550,740); ctx.clip(); lamp(ctx,x0+470,800,lt);
+      person(ctx,x0+190,840,1.25,{role,face:1,kneel:true,cry:fin(lt,30,1),t:lt,label:name,labelColor:col});
+      bubble(ctx,x0+150,170,370,' \n \n \n \n ',{think:true,tail:[x0+230,600],alpha:fin(lt,31,0.6)});
+      ctx.save(); ctx.beginPath(); ctx.rect(x0+170,180,330,170); ctx.clip(); person(ctx,x0+335,370,0.8,{role:dream,face:-1,alpha:0.85*fin(lt,31.5,0.8)}); ctx.restore();
+      chip(ctx,x0+335,392,dcol,col,{alpha:fin(lt,32,0.6),align:'center',size:20});
+      ctx.restore(); box(ctx,x0,140,550,740,{fill:null,stroke:col,r:14,lw:3}); }
+    chip(ctx,600,180,'따로따로, 같은 그리움','#fde68a',{alpha:fin(lt,37,0.6),align:'center',size:26});
+    ctx.restore(); }
+});
+
+// ---------- 6. 신이한 꿈 ----------
+SCENES.push({ title:'신이한 꿈: 재회의 예고', short:'⑥ 신이한 꿈', dur:39,
+  quote:'반갑도다. 반갑도다. 춘풍 소식 반갑도다. 죽었던 초목도 다 꽃이 피어 봄빛을 상대하니 무수한 들매화 송송이 떨어졌다.',
+  bullets:[[0,'원수의 꿈: 법당에서 노승이 노래를 지어 부름'],[8,'춘풍(봄바람) 소식 = 반가운 소식'],[14,'죽었던 초목이 꽃핌 = 죽은 줄 알았던 이가 살아 있음 → 재회 암시'],[22,'한림도 같은 꿈을 꿈 → 그러나 의심만 함'],[31,'꿈 = 재회를 예고하는 신이한 서사 장치']],
+  steps:[[0,'그날 밤 원수는 꿈을 꿔요. 법당에서 노승이 노래를 지어 불러요. “반갑도다, 반갑도다. 춘풍 소식 반갑도다.”'],
+         [8,'“죽었던 초목도 다 꽃이 피어 봄빛을 상대하니…” 겨울에 죽은 듯했던 나무에 다시 꽃이 피는 모습이에요.'],
+         [14,'죽었던 초목이 다시 꽃을 피우듯, 죽은 줄 알았던 형제가 살아 있다는 것, 곧 두 사람의 재회를 암시해요.'],
+         [22,'원수가 꿈에서 깨니 동쪽 하늘이 밝아 와요. 한림도 같은 꿈을 꾸었지만 그저 이상하게 여기며 의심할 뿐이에요.'],
+         [31,'이처럼 신이한 꿈은 형제의 재회를 미리 보여 주는 장치예요. 다만 두 사람이 꿈을 ‘서로 살아 있다는 징표’로 확신한 것은 아니에요!']],
+  draw(ctx,lt){
+    if(lt<22.3){ const a=fout(lt,21.7,0.6); ctx.save(); ctx.globalAlpha*=a; bgDream(ctx,lt);
+      txt(ctx,'— 원수(시호)의 꿈 —',600,180,{size:28,weight:700,align:'center',color:'#ddd6fe'});
+      if(lt<8.3){ person(ctx,420,850,1.35,{role:'oldmonk',face:1,mouth:0.5+0.5*Math.sin(lt*7),label:'노승',labelColor:'#e9d5ff'});
+        for(let k=0;k<5;k++){ const ph=(lt*0.4+k/5)%1; txt(ctx,'♪',500+ph*300+Math.sin(ph*9+k)*20,620-ph*320,{size:40,color:'#fde68a',alpha:(1-ph)}); }
+        bubble(ctx,620,300,500,'“반갑도다. 반갑도다. 춘풍 소식 반갑도다.”',{tail:[480,580],who:'노승의 노래',whoColor:'#6d28d9',alpha:fin(lt,0.8,0.6),size:28}); }
+      else { const bloom=ease((lt-9)/4);
+        tree(ctx,380,840,bloom,lt);
+        txt(ctx,bloom<0.5?'죽었던 초목':'꽃이 피어 봄빛을 상대하니',380,880,{size:28,weight:900,align:'center',color:'#fce7f3'});
+        bubble(ctx,650,230,480,'“죽었던 초목도 다 꽃이 피어 봄빛을 상대하니 무수한 들매화 송송이 떨어졌다.”',{who:'노승의 노래',whoColor:'#6d28d9',alpha:fin(lt,8.5,0.6),size:26});
+        const b=fin(lt,14,0.7); box(ctx,650,520,480,250,{alpha:b,fill:'rgba(15,23,42,.92)',stroke:'#f9a8d4'});
+        txt(ctx,'상징 읽기',890,565,{size:28,weight:900,align:'center',color:'#f9a8d4',alpha:b});
+        txt(ctx,'죽었던 초목 = 죽은 줄 알았던 형제',680,620,{size:23,weight:700,color:'#fff',alpha:b});
+        txt(ctx,'꽃이 핌 · 봄 = 살아 있음, 반가운 만남',680,665,{size:23,weight:700,color:'#fff',alpha:b});
+        txt(ctx,'→ 형제의 재회를 암시',680,725,{size:27,weight:900,color:'#fde68a',alpha:fin(lt,16.5,0.6)}); }
+      ctx.restore(); return; }
+    const a=fin(lt,22.3,0.6); ctx.save(); ctx.globalAlpha*=a; bgDawn(ctx,ease((lt-22.3)/5));
+    person(ctx,320,850,1.15,{role:'general',face:1,label:'원수(시호)',labelColor:K.ho});
+    person(ctx,880,850,1.1,{role:'monk',face:-1,label:'한림(시룡)',labelColor:K.ryong});
+    for(const [x,tx] of [[150,330],[700,880]]){ bubble(ctx,x,170,330,' \n \n \n \n ',{think:true,tail:[tx,600],alpha:fin(lt,23,0.6)}); ctx.save(); ctx.globalAlpha*=fin(lt,23,0.6); ctx.beginPath(); ctx.rect(x+20,175,290,165); ctx.clip(); ctx.translate(x+165,335); ctx.scale(0.36,0.36); tree(ctx,0,0,1,lt); ctx.restore(); }
+    chip(ctx,600,440,'같은 꿈!','#f9a8d4',{alpha:fin(lt,24,0.5),align:'center',size:28});
+    txt(ctx,'?',1010,600,{size:64,weight:900,align:'center',color:'#fde68a',alpha:fin(lt,25,0.5)});
+    chip(ctx,960,470,'한림: 의심만 함','#fde68a',{alpha:fin(lt,25,0.5),align:'center',size:22});
+    if(lt>31){ const b=fin(lt,31.2,0.6); box(ctx,170,560,860,140,{alpha:b,fill:'rgba(15,23,42,.94)',stroke:'#fbbf24'});
+      txt(ctx,'꿈 = 재회를 예고하는 신이한 장치',600,615,{size:30,weight:900,align:'center',color:'#fde68a',alpha:b});
+      txt(ctx,'단, 인물이 ‘살아 있다는 징표’로 확신한 것은 아님 (한림은 의심)',600,665,{size:24,weight:700,align:'center',color:'#fff',alpha:b}); }
+    ctx.restore(); }
+});
+
+// ---------- 7. 재회 ----------
+const DIALOG=[[8,'r','“원수는 무슨 일로 관세음보살 화상을 보시고 슬퍼하십니까?”'],
+  [14,'h','“나는 선친을 생각하여 슬퍼하거니와, 스님은 무슨 까닭으로 얼굴에 슬픈 빛을 품고 나의 눈물 흘리는 까닭을 묻습니까?”'],
+  [19.5,'r','“소승은 순천부에 살더니 동생을 잃고 매일 한탄하고 있습니다.”'],
+  [24,'r','“소승이 황송하지만 물어보겠습니다. 뉘 댁이라 하십니까?”'],
+  [27,'h','“부친께서 승상 벼슬을 지내신 까닭으로 목승상 댁이라 합니다. 대사는 성명이 무엇입니까?”'],
+  [32,'r','“… 엄승상의 참소를 입어 먼 곳으로 유배를 당하였다가 동생을 잃고 승려가 되었습니다. 소승의 본래 이름은 목시룡이로소이다.”'],
+  [38,'h','“나는 시호로소이다.”'],
+  [41,'r','“꿈인가. 생시인가. 동생아. 꿈에 왔느냐? … 악양루 물에 빠진 동생이 아니냐?”']];
+SCENES.push({ title:'법당에서의 재회', short:'⑦ 재회', dur:56,
+  quote:'“소승의 본래 이름은 목시룡이로소이다.” 하니 원수가 이 말을 듣고 크게 놀라 얼굴빛이 변하며 말하기를, “나는 시호로소이다.” 그저 이렇게 손을 잡고 모르는 사람처럼 보다가 큰소리로 울면서 말하기를, “꿈인가. 생시인가. 동생아. …”',
+  bullets:[[0,'법당: 대원수가 관세음보살 화상 앞에서 두 번 절하고 눈물'],[8,'한림: 슬퍼하는 까닭을 물음'],[14,'원수: 선친 생각 / 한림: 동생을 잃고 한탄'],[24,'“뉘 댁이라 하십니까?” → 목승상 댁'],[32,'“소승의 본래 이름은 목시룡이로소이다.”'],[38,'“나는 시호로소이다.” → 신분 확인, 재회'],[46,'서로 구르며 통곡 → 초목과 금수도 슬퍼하는 듯 (과장)']],
+  steps:[[0,'아침이 되자 대원수는 법당에 나아가 관세음보살 화상을 보고 두 번 절한 뒤 눈물을 흘려요.'],
+         [8,'이를 이상하게 여긴 한림이 묻지요. “원수는 무슨 일로 관세음보살 화상을 보시고 슬퍼하십니까?”'],
+         [14,'원수는 선친(돌아가신 아버지)을 생각하며 슬퍼한다고 답하고, 한림은 동생을 잃고 매일 한탄한다고 말해요. 서로 감동하여 눈물을 흘려요.'],
+         [24,'질문이 이어져요. “뉘 댁이라 하십니까?” “부친께서 승상을 지내셔서 목승상 댁이라 합니다.” 단서가 하나씩 맞춰지고 있어요!'],
+         [32,'한림이 자신의 사연을 밝혀요. “엄승상의 참소로 유배되었다가 동생을 잃고 승려가 되었습니다. 본래 이름은 목시룡이로소이다.”'],
+         [38,'원수가 크게 놀라 얼굴빛이 변하며 말해요. “나는 시호로소이다.” 한림은 손을 잡고 “꿈인가 생시인가. 동생아, 악양루 물에 빠진 동생이 아니냐?”'],
+         [46,'형제가 서로 붙들고 구르며 통곡하니, 그 울음소리가 하늘에 사무쳐 초목과 짐승들까지 다 슬퍼하는 듯했어요. 기쁨과 슬픔이 뒤섞인 눈물이에요.']],
+  draw(ctx,lt){
+    bgHallIn(ctx,lt);
+    if(lt<46){
+      const hoFace=lt<13?1:-1;
+      const hoX=lt<38?720:lerp(720,640,ease((lt-38)/2)), ryX=lt<38?lerp(150,330,ease((lt-6)/2)):lerp(330,520,ease((lt-38)/2));
+      person(ctx,hoX,860,1.25,{role:'general',face:hoFace,bow:lt<8?Math.abs(Math.sin(lt*Math.PI/4))*0.9:0,cry:lt<8?fin(lt,4,1):(lt>14?0.8:0),t:lt,label:'대원수(시호)',labelColor:K.ho});
+      if(lt>5.5) person(ctx,ryX,860,1.25,{role:'monk',face:1,cry:lt>19?0.8:0,t:lt,label:'한림(시룡)',labelColor:K.ryong,alpha:fin(lt,5.5,0.8)});
+      // latest two dialog lines
+      const shown=DIALOG.filter(d=>lt>=d[0]); const last=shown.slice(-2);
+      last.forEach((d,i)=>{ const isR=d[1]==='r'; const y=i===last.length-1&&last.length>1?370:165; const x=isR?60:500;
+        bubble(ctx,x,y,620,d[2],{who:isR?'한림(시룡)':'원수(시호)',whoColor:isR?'#1d4ed8':'#c2410c',alpha:fin(lt,d[0],0.5)*(i===last.length-1?1:0.6),size:24}); });
+      const clues=[[20,'동생을 잃음'],[28,'목승상 댁'],[34.5,'이름: 목시룡']];
+      clues.forEach(([t,s],i)=>chip(ctx,60+i*270,585,'단서 '+(i+1)+': '+s,'#fde68a',{alpha:fin(lt,t,0.5)*fout(lt,37.5,0.5),size:22}));
+      if(lt>38&&lt<39.4){ ctx.save(); ctx.globalAlpha*=Math.sin((lt-38)/1.4*Math.PI)*0.7; ctx.fillStyle='#fff'; ctx.fillRect(0,120,1200,800); ctx.restore(); }
+      if(lt>39) chip(ctx,(ryX+hoX)/2,560,'헤어졌던 형제가 마침내 서로를 알아봄','#fde68a',{alpha:fin(lt,39.3,0.6),align:'center',size:24});
+    } else {
+      const b=fin(lt,46,0.8);
+      person(ctx,540,845,1.3,{role:'monk',face:1,kneel:true,cry:1,t:lt,label:'시룡',labelColor:K.ryong});
+      person(ctx,660,845,1.3,{role:'general',face:-1,kneel:true,cry:1,t:lt,label:'시호',labelColor:K.ho});
+      sadness(ctx,600,560,lt,b);
+      const side=(x,flip)=>{ pine(ctx,x,880,0.9,'#365314'); };
+      side(110); side(1060);
+      ctx.save(); ctx.globalAlpha*=b; ctx.fillStyle='#a16207';
+      ctx.beginPath(); ctx.ellipse(250,830,40,22,0,0,Math.PI*2); ctx.fill(); ctx.fillRect(220,840,6,40); ctx.fillRect(270,840,6,40); ctx.beginPath(); ctx.ellipse(285,800,14,12,0.6,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#e7e5e4'; ctx.beginPath(); ctx.ellipse(950,330,20,12,0,0,Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.moveTo(940,330); ctx.lineTo(920,310); ctx.lineTo(950,325); ctx.fill(); ctx.restore();
+      txt(ctx,'禽獸 (새와 짐승)',250,770,{size:20,align:'center',color:'#fde68a',alpha:b}); txt(ctx,'草木 (풀과 나무)',1060,900,{size:20,align:'center',color:'#fde68a',alpha:b});
+      bubble(ctx,140,170,920,'“꿈인가. 생시인가. 동생아. 꿈에 왔느냐? 마음도 아니로다. 악양루 물에 빠진 동생이 아니냐?”',{who:'한림(시룡)',whoColor:'#1d4ed8',alpha:b,size:26});
+      chip(ctx,600,330,'처량한 울음소리가 하늘에 사무치고 초목과 금수도 슬퍼하는 듯 (과장된 표현)','#fde68a',{alpha:fin(lt,48,0.6),align:'center',size:22});
+    }
+  }});
+
+// ---------- 8. SUMMARY ----------
+SCENES.push({ title:'한눈에 정리 · 문항 연결 포인트', short:'⑧ 정리 · 문항', dur:50, full:true,
+  steps:[[0,'「목시룡전」의 흐름: 충과 효를 위한 이별 → 모함과 엇갈림 → 악인 처벌 → 나라의 위기 → 신이한 꿈 → 재회'],
+         [16,'문항 연결: 인물의 호칭(한림 = 시룡, 원수 = 시호)과 ‘누가 무엇을 했는지’를 정확히 잡으면 선택지의 함정이 보여요.'],
+         [34,'특히 ‘얼굴/목소리’, ‘편지/직접 만남’, ‘스스로/권유’처럼 한 부분만 바꾼 선택지를 조심하세요!']],
+  draw(ctx,lt){
+    if(lt<16.3){ const a=fout(lt,15.7,0.6);
+      txt(ctx,'「목시룡전」 — 이별에서 재회까지',W/2,230,{size:44,weight:900,align:'center',alpha:a*fin(lt,0,0.8)});
+      const flow=[['이별','충과 효를 위해 헤어짐',K.ho],['시련','모함 · 유배 · 투신',K.villain],['악인 처벌','질서 회복 · 원한 해소','#f87171'],['국가 위기','역병 → 황용사 제사','#4ade80'],['신이한 꿈','죽었던 초목에 꽃','#f9a8d4'],['재회','우애의 실현',K.ryong]];
+      flow.forEach(([t,s,col],i)=>{ const b=a*fin(lt,0.5+i*1.4,0.6), x=60+i*305, y=330;
+        box(ctx,x,y,270,200,{alpha:b,fill:'#15203a',stroke:col});
+        badge(ctx,x+36,y+38,String(i+1),col,{r:22,alpha:b,size:22});
+        txt(ctx,t,x+135,y+108,{size:36,weight:900,align:'center',alpha:b,color:col});
+        txt(ctx,s,x+135,y+156,{size:20,align:'center',alpha:b,color:'#cbd5e1'});
+        if(i<5) arrow(ctx,x+274,y+100,x+302,y+100,{color:'#fbbf24',width:5,head:14,alpha:b}); });
+      const b=a*fin(lt,9.5,0.8); box(ctx,260,590,1400,120,{alpha:b,fill:'#3b2a0a',stroke:'#fbbf24'});
+      txt(ctx,'주제: 시련 속에서도 이어진 형제의 우애와, 그것이 온전히 실현되는 재회',W/2,665,{size:32,weight:900,align:'center',color:'#fde68a',alpha:b});
+      return; }
+    const a=fin(lt,16.3,0.6);
+    txt(ctx,'문항 연결 포인트 (정답과 근거)',W/2,190,{size:42,weight:900,align:'center',alpha:a});
+    const cards=[
+      ['31번','정답 ③','황제는 시룡을 불쌍하게 여겨 품계를 올려 주었다 ○','‘한림’ = 시룡 → 충열공. 함정: ① 황제는 허락함 ② 병서는 시호 스스로의 뜻 ④ 형수에게 편지만 보냄 ⑤ 얼굴이 아니라 목소리'],
+      ['32번','정답 ④','“㉠: 상대가 겪을 일을 보여 주어 긴장감 고조” ✗','㉠은 상대(시호)가 겪을 일이 아니라, 조정 상황에 대한 시룡 자신의 불안을 비유로 드러낸 글이에요. (㉠·㉡ 모두 시호에게 전달됨)'],
+      ['33번','정답 ⑤','“형제가 꿈을 서로 살아 있다는 징표로 여김” ✗','꿈은 재회를 암시하는 신이한 장치지만, 한림은 의심만 했고 형제가 이를 징표로 확신한 것은 아니에요.']];
+    cards.forEach(([q,ans,claim,why],i)=>{ const b=a*fin(lt,16.8+i*2.4,0.7), x=70+i*600, y=240;
+      box(ctx,x,y,570,560,{alpha:b,fill:'#15203a',stroke:C.line});
+      txt(ctx,q,x+30,y+62,{size:40,weight:900,alpha:b,color:C.accent}); txt(ctx,ans,x+160,y+62,{size:34,weight:900,alpha:b,color:C.gold});
+      ctx.save(); ctx.globalAlpha*=b; const ch=para(ctx,claim,x+30,y+100,510,{size:27,weight:700,color:'#fca5a5'}); para(ctx,why,x+30,y+124+ch,510,{size:26,color:C.text}); ctx.restore(); });
+  }});
+
+/* ================= FRAME ================= */
+const STARTS=[]; let TOTAL=0; for(const s of SCENES){STARTS.push(TOTAL); TOTAL+=s.dur;}
+function sceneAt(T){ let i=SCENES.length-1; for(let k=0;k<SCENES.length;k++){ if(T<STARTS[k]+SCENES[k].dur){i=k;break;} } return [i,T-STARTS[i]]; }
+
+function drawPanel(ctx,s,lt){
+  const x=1190,y=130,w=690,h=770;
+  box(ctx,x,y,w,h,{fill:C.panel,stroke:C.line,r:18});
+  txt(ctx,'지문 속 근거',x+30,y+50,{size:24,weight:700,color:C.accent});
+  ctx.save(); ctx.font=font(23,400);
+  const qh=para(ctx,s.quote.startsWith('“')?s.quote:'“'+s.quote+'”',x+30,y+70,w-60,{size:23,lh:1.55,color:'#cbd5e1'});
+  ctx.restore();
+  let yy=y+70+qh+30;
+  ctx.strokeStyle=C.line; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(x+30,yy-12); ctx.lineTo(x+w-30,yy-12); ctx.stroke();
+  txt(ctx,'핵심 정리',x+30,yy+28,{size:24,weight:700,color:C.gold});
+  yy+=50;
+  for(const [t,b] of s.bullets){
+    const a=fin(lt,t,0.7); if(a<=0) continue;
+    const cur=lt>=t && (s.bullets.find(([t2])=>t2>t)?.[0]??1e9)>lt;
+    ctx.save(); ctx.globalAlpha*=a;
+    if(cur){box(ctx,x+18,yy-6,w-36,0+measureLines(ctx,b,w-90,25)*25*1.45+12,{fill:'rgba(56,189,248,.12)',stroke:null,r:10});}
+    ctx.beginPath(); ctx.arc(x+40,yy+17,6,0,Math.PI*2); ctx.fillStyle=cur?C.accent:'#64748b'; ctx.fill();
+    const hgt=para(ctx,b,x+60,yy,w-90,{size:25,lh:1.45,weight:cur?700:400,color:cur?'#fff':'#cbd5e1'});
+    ctx.restore();
+    yy+=hgt+14;
+  }
+}
+function measureLines(ctx,s,maxW,size){ctx.save(); ctx.font=font(size,700); const n=wrap(ctx,s,maxW).length; ctx.restore(); return n;}
+
+function renderAt(T){
+  const ctx=document.getElementById('cv').getContext('2d');
+  T=clamp(T,0,TOTAL-0.001);
+  const [i,lt]=sceneAt(T); const s=SCENES[i];
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.globalAlpha=1;
+  ctx.fillStyle=C.bg; ctx.fillRect(0,0,W,H);
+  const bgG=ctx.createRadialGradient(600,500,100,600,500,1100); bgG.addColorStop(0,'#101a30'); bgG.addColorStop(1,'#0a101d'); ctx.fillStyle=bgG; ctx.fillRect(0,0,W,H);
+  // header
+  if(i>0) badge(ctx,80,62,String(i),'#0ea5e9',{r:32,size:32});
+  txt(ctx,s.title,i>0?130:60,78,{size:42,weight:900});
+  txt(ctx,HEADER_TAG,1880,74,{size:20,align:'right',color:C.sub});
+  ctx.strokeStyle=C.line; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(40,112); ctx.lineTo(1880,112); ctx.stroke();
+  // scene body
+  ctx.save();
+  const sceneFade=fin(lt,0,0.6)*fout(lt,s.dur-0.45,0.45);
+  ctx.globalAlpha=sceneFade;
+  ctx.beginPath(); s.full?ctx.rect(0,114,W,800):ctx.rect(30,120,1140,790); ctx.clip();
+  s.draw(ctx,lt);
+  ctx.restore();
+  if(!s.full){ ctx.save(); ctx.globalAlpha=sceneFade; drawPanel(ctx,s,lt); ctx.restore(); }
+  // caption
+  let cap=s.steps[0], ci=0; s.steps.forEach((st,k)=>{if(lt>=st[0]){cap=st;ci=k;}});
+  box(ctx,40,920,1840,120,{fill:'rgba(15,23,42,.95)',stroke:C.line,r:16});
+  const ca=fin(lt,cap[0],0.5)*sceneFade;
+  ctx.save(); ctx.font=font(33,500); const lines=wrap(ctx,cap[1],1760); ctx.restore();
+  const lh=46, y0=980-(lines.length-1)*lh/2;
+  lines.forEach((l,k)=>txt(ctx,l,W/2,y0+k*lh+12,{size:33,weight:500,align:'center',alpha:ca}));
+  // progress
+  const px=40,pw=1840,py=1056;
+  SCENES.forEach((sc,k)=>{const x=px+pw*STARTS[k]/TOTAL, w=pw*sc.dur/TOTAL-4; box(ctx,x,py,w,10,{fill:'#1f2937',stroke:null,r:5});
+    const f=clamp((T-STARTS[k])/sc.dur); if(f>0) box(ctx,x,py,Math.max(6,w*f),10,{fill:k===i?C.accent:'#2f6f8f',stroke:null,r:5});});
+}
+
+/* ================= PLAYER ================= */
+const isRender=/[?&]render/.test(location.search);
+window.renderAt=renderAt; window.TOTAL=TOTAL; window.STARTS=STARTS;
+if(isRender){ document.documentElement.classList.add('render'); }
+else {
+  let T=0, playing=false, last=null;
+  const btn=document.getElementById('play'), seek=document.getElementById('seek'), time=document.getElementById('time'), chips=document.getElementById('chips');
+  const fmt=s=>Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0');
+  SCENES.forEach((s,k)=>{const b=document.createElement('button'); b.textContent=s.short; b.onclick=()=>{T=STARTS[k]+0.01; draw();}; chips.appendChild(b);});
+  function draw(){ renderAt(T); seek.value=Math.round(T/TOTAL*1000); time.textContent=fmt(T)+' / '+fmt(TOTAL);
+    const [i]=sceneAt(T); [...chips.children].forEach((c,k)=>c.classList.toggle('on',k===i)); }
+  function loop(ts){ if(playing){ if(last!=null) T+= (ts-last)/1000; last=ts; if(T>=TOTAL){T=TOTAL-0.01; setPlay(false);} draw(); requestAnimationFrame(loop);} }
+  function setPlay(p){ playing=p; btn.textContent=p?'⏸ 일시정지':'▶ 재생'; last=null; if(p){ if(T>=TOTAL-0.05) T=0; requestAnimationFrame(loop);} }
+  btn.onclick=()=>setPlay(!playing);
+  seek.oninput=()=>{T=seek.value/1000*TOTAL; draw();};
+  document.getElementById('prev').onclick=()=>{const [i,lt]=sceneAt(T); T=STARTS[Math.max(0,lt<1.5?i-1:i)]+0.01; draw();};
+  document.getElementById('next').onclick=()=>{const [i]=sceneAt(T); T=STARTS[Math.min(SCENES.length-1,i+1)]+0.01; draw();};
+  addEventListener('keydown',e=>{ if(e.code==='Space'){e.preventDefault(); setPlay(!playing);} if(e.code==='ArrowRight'){T=Math.min(TOTAL-0.01,T+5); draw();} if(e.code==='ArrowLeft'){T=Math.max(0,T-5); draw();} });
+  (document.fonts?document.fonts.load('700 30px "Noto Sans KR"').catch(()=>{}):Promise.resolve()).then(()=>draw());
+  draw();
+}
+</script>
+
+</body>
+</html>

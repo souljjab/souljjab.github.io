@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>민법의 대리 · 상법의 보조상 — 2026 10월 고1 학평 국어 [18~23]</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;background:#060a14;color:#e5e7eb;font-family:"Noto Sans KR","Noto Sans CJK KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif}
+  #wrap{max-width:1600px;margin:0 auto;padding:12px}
+  canvas{width:100%;height:auto;display:block;border-radius:10px;background:#0b1220}
+  #ui{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
+  button{background:#1e293b;color:#e5e7eb;border:1px solid #334155;border-radius:8px;padding:8px 14px;font:inherit;font-size:15px;cursor:pointer}
+  button:hover{background:#273449}
+  button.on{background:#0ea5e9;border-color:#0ea5e9;color:#04121f;font-weight:700}
+  #seek{flex:1;min-width:200px}
+  #time{font-variant-numeric:tabular-nums;font-size:14px;color:#94a3b8;min-width:110px;text-align:right}
+  #chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .render #ui,.render #chips,.render #note,.render #drill{display:none}
+  .render #wrap{padding:0;max-width:none}
+  .render canvas{border-radius:0}
+  #note{font-size:14px;color:#94a3b8;margin-top:10px;line-height:1.6}
+  #note a{color:#38bdf8}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="cv" width="1920" height="1080"></canvas>
+  <div id="ui">
+    <button id="play">▶ 재생</button>
+    <button id="prev">⏮ 이전 장면</button>
+    <button id="next">다음 장면 ⏭</button>
+    <input id="seek" type="range" min="0" max="1000" value="0">
+    <span id="time">0:00 / 0:00</span>
+  </div>
+  <div id="chips"></div>
+  <div id="note">스페이스바: 재생/일시정지 · ←/→: 5초 이동 · 장면 버튼으로 원하는 부분부터 볼 수 있어요. 영상 아래에 <b>헷갈림 교정 훈련</b>이 있어요. <a href="agency.mp4">동영상(MP4) 내려받기</a></div>
+</div>
+<section id="drill">
+  <h2>헷갈림 교정 훈련</h2>
+  <p class="lead">영상으로 개념을 봤다면, 이제 <b>자주 틀리는 지점</b>을 직접 고쳐 봅시다. 먼저 오해 카드를 확인하고, 아래 드릴에서 풀어 보세요. 틀린 문제는 다시 풀 수 있어요.</p>
+
+  <h3>1. 자주 하는 실수 9가지</h3>
+  <div id="cards" class="cards"></div>
+
+  <h3>2. 교정 드릴</h3>
+  <div class="drillbar">
+    <div class="filters" id="filters"></div>
+    <div class="prog"><div id="progfill"></div></div>
+    <span id="progtxt"></span>
+  </div>
+  <div id="quiz" class="quiz"></div>
+</section>
+<style>
+  #drill{max-width:1100px;margin:28px auto 60px;padding:0 12px;line-height:1.6}
+  #drill h2{font-size:30px;margin:0 0 6px}
+  #drill h3{font-size:22px;margin:30px 0 12px;color:#fbbf24}
+  #drill .lead{color:#cbd5e1;font-size:16px;margin:0}
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr));gap:12px}
+  .card{background:#131d33;border:1px solid #2b3a57;border-radius:14px;padding:16px}
+  .card .t{font-weight:900;font-size:17px;margin-bottom:8px;color:#e5e7eb}
+  .card .wrong{color:#fecaca;font-size:15px;text-decoration:line-through;text-decoration-color:#f87171}
+  .card .right{display:none;margin-top:10px;font-size:15px}
+  .card.open .right{display:block}
+  .card .right .ok{color:#bbf7d0;font-weight:700}
+  .card .right .src{color:#94a3b8;font-size:14px;margin-top:6px}
+  .card .right .tip{margin-top:8px;background:#3b2a0a;border:1px solid #fbbf24;border-radius:10px;padding:8px 10px;color:#fde68a;font-size:14px}
+  .card button{margin-top:10px;min-height:40px}
+  .drillbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px}
+  .filters{display:flex;flex-wrap:wrap;gap:6px}
+  .filters button{font-size:14px;padding:6px 12px;min-height:38px}
+  .prog{flex:1;min-width:160px;height:10px;background:#1f2937;border-radius:5px;overflow:hidden}
+  #progfill{height:100%;width:0;background:#38bdf8;transition:width .3s}
+  #progtxt{color:#94a3b8;font-size:14px;font-variant-numeric:tabular-nums}
+  .quiz{background:#131d33;border:1px solid #2b3a57;border-radius:16px;padding:22px}
+  .quiz .tag{display:inline-block;font-size:13px;color:#7dd3fc;border:1px solid #38bdf8;border-radius:999px;padding:2px 10px;margin-bottom:10px}
+  .quiz .q{font-size:20px;font-weight:700;margin-bottom:16px}
+  .quiz .opts{display:flex;flex-wrap:wrap;gap:10px}
+  .quiz .opts button{font-size:17px;padding:10px 18px;min-height:48px;min-width:110px}
+  .quiz .opts button.good{background:#14532d;border-color:#4ade80}
+  .quiz .opts button.badc{background:#7f1d1d;border-color:#f87171}
+  .quiz .fb{margin-top:16px;border-radius:12px;padding:14px 16px;font-size:16px}
+  .quiz .fb.ok{background:#052e16;border:1px solid #4ade80}
+  .quiz .fb.no{background:#450a0a;border:1px solid #f87171}
+  .quiz .fb .src{color:#cbd5e1;font-size:14px;margin-top:8px;border-left:3px solid #64748b;padding-left:10px}
+  .quiz .nav{margin-top:16px;display:flex;gap:10px;flex-wrap:wrap}
+  .res h4{font-size:24px;margin:0 0 10px}
+  .res table{width:100%;border-collapse:collapse;margin:10px 0}
+  .res td,.res th{border-bottom:1px solid #2b3a57;padding:8px;text-align:left;font-size:15px}
+  .res td.n{text-align:right;font-variant-numeric:tabular-nums}
+  .res .weak{color:#fca5a5;font-weight:700}
+  #drill button:focus-visible{outline:3px solid #38bdf8;outline-offset:2px}
+</style>
+<script>
+{
+const MIS=[
+ ['말하는 사람 vs 효과 받는 사람','대리에서는 의사표시를 한 대리인에게 법률효과가 생긴다.','의사표시는 대리인이 하지만, 법률효과는 본인에게 귀속돼요. 둘이 “분리”되는 것이 대리의 핵심.','“실제로 의사표시를 하는 자와 그 법률효과가 귀속되는 자가 분리되므로”','말은 대리인이, 효과는 본인이!'],
+ ['임의대리 vs 법정대리','임의대리에서는 법률 규정에 따라 대리권이 자동으로 주어진다.','임의대리는 본인의 의사(수권행위)로 대리권이 생기고, 법률 규정에 따른 것은 법정대리예요.','“임의대리에서는 본인이 대리인에게 대리권을 수여하는 수권행위에 의해 대리권이 발생한다.”','임의 = 내 마음(본인 의사) / 법정 = 법이 정함'],
+ ['현명은 누구에게?','현명은 대리인이 본인에게 “당신을 위해 하겠다”고 알리는 것이다.','현명은 대리인이 상대방에게 본인을 위한 행위임을 표시하는 것이에요. 상대방이 효과가 누구에게 가는지 알게 하려는 것.','“대리인은 상대방에게 … 본인을 위해 법률행위를 한다는 것을 표시하는 ‘현명’을 하여야 한다.”','현명(顯名) = 상대방 앞에서 본인의 이름을 드러냄'],
+ ['현명이 없으면 무조건 무효?','현명을 하지 않으면 법률효과는 절대 본인에게 귀속되지 않는다.','현명이 없더라도 상대방이 대리 행위임을 알 수 있었다면 예외적으로 본인에게 귀속돼요.','“다만 현명이 없었더라도 … 상대방이 알 수 있는 경우에는 예외적으로 … 본인에게 귀속된다.”','원칙(현명 필요) + 예외(상대방이 알 수 있었음)'],
+ ['자기계약 vs 쌍방대리','자기계약은 한 명의 대리인이 양측 당사자를 모두 대리하는 것이다.','그건 쌍방대리예요. 자기계약은 대리인이 본인을 대리하면서 동시에 자기가 그 상대방이 되는 경우.','“자기계약은 … 동시에 그 법률행위의 상대방이 되는 경우이고 쌍방대리는 … 양측 당사자를 모두 대리하는 경우”','자기계약 = 대리인 ‘자기’가 상대방 / 쌍방대리 = ‘양쪽’ 다 대리'],
+ ['예외 허용의 조건','본인에게 이익이 된다면 새 조건을 정하는 자기계약도 허용된다.','지문의 예외는 ① 새 조건·이해관계 조정이 아닌 기존 의무 실현에 가까울 때, ② 본인이 별도로 허락했을 때뿐이에요.','“새로운 계약 조건을 정하거나 이해관계를 조정하는 경우가 아닌 기존의 의무를 실현하는 것에 가까울 때” “본인이 별도로 허락한 경우”','예: 이미 정해진 채무를 그대로 갚기 → 위험이 작아서 허용'],
+ ['체약대리상 vs 중개대리상','중개대리상도 본인의 명의로 계약을 체결한다.','중개대리상은 거래를 알선할 뿐 의사표시도 계약도 하지 않아요. 본인 명의로 계약을 대신 체결하는 것은 체약대리상.','“중개대리상은 거래를 알선할 뿐 본인을 대신하여 의사표시를 하거나 계약하지 않는다.”','체약 = 계약 체결 / 중개 = 소개·알선'],
+ ['위탁매매인: 명의와 계산','위탁매매인이 맺은 계약의 이익은 위탁매매인에게, 당사자는 위탁자이다.','정반대! 계약 당사자(명의)는 위탁매매인, 이익과 손해(계산)는 위탁자에게 가요.','“‘자기 명의로써’ … 위탁매매인이 계약 당사자가 되어 … ‘타인의 계산으로’ … 이익과 손해가 위탁자에게 귀속된다”','이름(명의)은 위탁매매인, 주머니(계산)는 위탁자'],
+ ['권리 짝짓기','개입권은 위탁자의 이익을 보호하는 방안이고, 유치권은 위탁매매인에게만 있다.','유치권은 대리상·위탁매매인 모두, 보상청구권은 대리상, 개입권은 위탁매매인의 권리예요. 이 권리들은 보조상의 영업활동을 보호하려는 것이에요. 개입권을 행사해도 보수 청구 가능.','“상법은 본인이나 위탁자의 이익뿐 아니라 보조상의 영업활동을 보호하기 위하여도 다양한 권리를 인정한다.”','유치권(둘 다) · 보상(대리상) · 개입(위탁매매인)']
+];
+const Q=[
+ {t:'세 주체',k:'ox',q:'대리에서 의사표시를 하는 사람과 법률효과가 귀속되는 사람은 같다.',a:'X',why:'의사표시는 대리인, 효과는 본인. 둘은 분리돼요.',src:'실제로 의사표시를 하는 자와 그 법률효과가 귀속되는 자가 분리되므로'},
+ {t:'세 주체',k:'mc',q:'지민이 삼촌에게 노트북 구매를 맡겼고, 삼촌이 판매자와 계약했다. ‘상대방’은 누구일까?',o:['지민','삼촌','판매자'],a:'판매자',why:'상대방 = 대리인과 거래하는 당사자. 지민은 본인, 삼촌은 대리인이에요.',src:'대리인과 거래하는 당사자를 상대방이라고 한다.'},
+ {t:'대리권',k:'ox',q:'임의대리에서 대리권은 법률 규정에 따라 자동으로 생긴다.',a:'X',why:'임의대리는 본인의 수권행위로 대리권이 생겨요. 법률 규정에 따른 것은 법정대리. (19번 ②)',src:'임의대리에서는 본인이 대리인에게 대리권을 수여하는 수권행위에 의해 대리권이 발생한다.'},
+ {t:'대리권',k:'ox',q:'대리권에는 상대방의 의사표시를 ‘받는’ 자격도 포함된다.',a:'O',why:'대리권은 본인을 위해 의사표시를 “하거나 받음으로써” 효과를 본인에게 귀속시키는 자격이에요.',src:'대리인이 본인을 위하여 상대방에게 의사표시를 하거나 받음으로써 본인에게 법률효과를 귀속시키는 법률상의 자격'},
+ {t:'현명주의',k:'ox',q:'현명은 대리인이 본인에게 “당신을 위해 계약하겠다”고 알리는 것이다.',a:'X',why:'현명은 상대방에게 하는 표시예요.',src:'대리인은 상대방에게 자신이 대리권의 범위 내에서 본인을 위해 법률행위를 한다는 것을 표시하는 ‘현명’을 하여야 한다.'},
+ {t:'현명주의',k:'ox',q:'현명이 없었더라도 상대방이 대리 행위임을 알 수 있었다면, 효과는 본인에게 귀속된다.',a:'O',why:'현명주의의 예외예요.',src:'다만 현명이 없었더라도 … 상대방이 알 수 있는 경우에는 예외적으로 그 행위의 법률효과가 본인에게 귀속된다.'},
+ {t:'현명주의',k:'mc',q:'현명주의가 필요한 이유로 지문에 나온 것은?',o:['대리인의 보수를 정하기 위해','법률효과가 귀속되는 자가 누구인지 상대방이 알 수 있게 하려고','본인이 대리인을 감시하기 위해'],a:'법률효과가 귀속되는 자가 누구인지 상대방이 알 수 있게 하려고',why:'현명주의는 상대방이 진짜 거래 상대(효과 귀속자)를 알게 해 줘요.',src:'이는 법률효과가 귀속되는 자가 누구인지 상대방이 알 수 있게 한다.'},
+ {t:'이익 충돌',k:'ox',q:'대리인은 본인의 의사를 그대로 전달하기만 하는 사람이다.',a:'X',why:'대리인은 실제로 의사표시를 하는 주체라서 이익 충돌 가능성이 생겨요.',src:'대리인은 단순히 본인의 의사를 전달하는 자가 아니라 실제로 의사표시를 하는 주체이므로'},
+ {t:'자기계약·쌍방대리',k:'mc',q:'삼촌이 지민의 대리인이면서, 자기 소유 노트북을 지민에게 파는 계약을 맺었다.',o:['자기계약','쌍방대리','문제없는 대리'],a:'자기계약',why:'대리인 자신이 그 계약의 상대방이 되는 경우 = 자기계약 (원칙적 금지).',src:'자기계약은 대리인이 본인을 대신해 법률행위를 하면서 동시에 그 법률행위의 상대방이 되는 경우'},
+ {t:'자기계약·쌍방대리',k:'mc',q:'한 사람이 집을 파는 쪽과 사는 쪽을 동시에 대리해 가격을 정했다.',o:['자기계약','쌍방대리','현명'],a:'쌍방대리',why:'하나의 법률행위에서 한 명의 대리인이 양측을 모두 대리 = 쌍방대리.',src:'쌍방대리는 하나의 법률행위에서 한 명의 대리인이 양측 당사자를 모두 대리하는 경우'},
+ {t:'자기계약·쌍방대리',k:'ox',q:'자기계약은 양측 당사자 모두의 이익이 충분히 보호받지 못할 위험 때문에 금지된다.',a:'X',why:'그 위험은 쌍방대리의 경우예요. 자기계약은 대리인이 사적 이익을 추구해 본인 이익을 침해할 위험.',src:'자기계약의 경우 대리인이 자신의 사적 이익을 추구하여 … 쌍방대리의 경우 양측 당사자 모두가 이익을 충분히 보호받지는 못할 위험'},
+ {t:'예외 허용',k:'ox',q:'이미 정해진 채무를 그대로 갚아 나가는 상황이라면 자기계약·쌍방대리가 예외적으로 허용될 수 있다.',a:'O',why:'기존 의무를 실현하는 것에 가까워서 본인 이익 침해 위험이 작아요.',src:'이미 정해진 채무를 그대로 갚아 나가면 되는 상황 등이 그 예이다.'},
+ {t:'예외 허용',k:'ox',q:'새로운 계약 조건을 정하는 경우라도 본인에게 이익이 되면 자기계약이 허용된다.',a:'X',why:'지문의 예외는 ‘기존 의무 실현에 가까움’과 ‘본인의 별도 허락’뿐이에요.',src:'새로운 계약 조건을 정하거나 이해관계를 조정하는 경우가 아닌 기존의 의무를 실현하는 것에 가까울 때'},
+ {t:'예외 허용',k:'mc',q:'㉠(기존 의무 실현에 가까울 때 예외 허용)의 이유로 가장 적절한 것은?',o:['본인의 명시적 허락이 있었기 때문','본인의 이익이 침해될 위험이 상대적으로 작기 때문','의사표시의 주체가 본인으로 바뀌기 때문'],a:'본인의 이익이 침해될 위험이 상대적으로 작기 때문',why:'조건이 이미 정해져 있어 대리인이 본인 이익을 해칠 여지가 작아요. (20번 ④) 본인의 허락은 별개의 예외예요.',src:'자기계약과 쌍방대리는 원칙적으로 금지된다. 다만 ㉠ …'},
+ {t:'보조상',k:'ox',q:'대리상과 위탁매매인은 본인(위탁자) 회사에 소속된 직원이다.',a:'X',why:'둘 다 독립된 상인이에요.',src:'이들은 모두 독립된 상인이라는 점은 같지만 거래 시 누구의 명의로 행위하는지가 서로 다르다.'},
+ {t:'대리상',k:'ox',q:'중개대리상은 본인의 명의로 계약을 체결한다.',a:'X',why:'중개대리상은 알선만 해요. 본인 명의로 계약을 체결하는 것은 체약대리상.',src:'중개대리상은 거래를 알선할 뿐 본인을 대신하여 의사표시를 하거나 계약하지 않는다.'},
+ {t:'대리상',k:'mc',q:'체약대리상이 맺은 계약의 당사자는?',o:['체약대리상','본인(대리상이 대리하는 상인)','상대방만'],a:'본인(대리상이 대리하는 상인)',why:'체약대리상은 본인 명의로 의사표시 → 효과가 직접 본인에게, 본인이 계약 당사자.',src:'이때 본인은 대리상이 대리하는 상인으로, 계약의 당사자가 된다.'},
+ {t:'위탁매매인',k:'mc',q:'위탁매매인이 맺은 매매 계약의 ‘당사자’는?',o:['위탁자','위탁매매인','거래소'],a:'위탁매매인',why:'자기 명의로써 = 위탁매매인이 계약 당사자, 권리·의무의 주체.',src:'‘자기 명의로써’라는 것은 위탁매매인이 계약 당사자가 되어 직접 권리와 의무의 주체가 된다는 뜻'},
+ {t:'위탁매매인',k:'ox',q:'위탁매매에서 발생한 손해는 위탁매매인에게 귀속된다.',a:'X',why:'타인의 계산으로 = 이익과 손해는 위탁자에게.',src:'‘타인의 계산으로’라는 것은 그 거래의 이익과 손해가 위탁자에게 귀속된다는 뜻'},
+ {t:'위탁매매인',k:'ox',q:'상대방이 채무를 갚지 않으면 위탁매매인이 위탁자에게 그 채무를 갚을 책임을 진다.',a:'O',why:'위탁자 보호를 위한 장치예요.',src:'위탁매매인이 행한 거래로 발생한 채무를 상대방이 갚지 않을 경우에는 위탁매매인이 위탁자에게 해당 채무를 갚아야 할 책임을 지도록 한다.'},
+ {t:'위탁매매인',k:'mc',q:'민수가 ‘주당 1만 원 이하’로 지정했는데 위탁매매인이 1만 500원에 샀다. 그 결과가 민수에게 귀속되려면?',o:['민수가 차액 500원을 더 낸다','위탁매매인이 차액 500원을 부담한다','어떤 경우에도 귀속될 수 없다'],a:'위탁매매인이 차액 500원을 부담한다',why:'불리하게 거래했다면 위탁매매인이 차액을 부담해야만 결과가 위탁자에게 귀속돼요.',src:'위탁매매인이 그 차액을 부담해야만 그 거래의 결과가 위탁자에게 귀속되도록 한다.'},
+ {t:'권리',k:'cls',q:'유치권 (수수료·비용을 못 받으면 물건을 돌려주지 않을 수 있는 권리)',a:'둘 다',why:'대리상과 위탁매매인 모두 가져요. (21번 ③은 적절)',src:'대리상과 위탁매매인은 … 물건 등을 돌려주지 않을 수 있는 유치권을 가진다.'},
+ {t:'권리',k:'cls',q:'보상청구권 (계약 종료 후에도 본인이 이익을 얻으면 일정 기간 내 보상 청구)',a:'대리상',why:'대리상의 활동으로 거래가 늘고, 계약 종료 후에도 본인이 이익을 얻는 경우에 인정돼요.',src:'대리상에게는 일정 기간 내에 보상을 청구할 수 있는 보상청구권이 인정된다.'},
+ {t:'권리',k:'cls',q:'개입권 (거래소 시세가 있는 물건·유가증권 거래에서 직접 상대방이 될 수 있음)',a:'위탁매매인',why:'위탁매매인의 권리이고, 행사해도 보수를 청구할 수 있어요.',src:'위탁매매인에게는 객관적인 거래소 시세가 있는 물건이나 유가증권에 대하여는 직접 자신이 거래의 상대방이 될 수 있는 개입권이 인정되며'},
+ {t:'권리',k:'ox',q:'개입권은 위탁자의 이익을 보호하기 위한 방안이다.',a:'X',why:'지문은 개입권을 ‘보조상의 영업활동을 보호’하기 위한 권리로 소개해요. (21번 ④) 위탁자 보호 장치는 이행담보책임·차액 부담 쪽이에요.',src:'상법은 본인이나 위탁자의 이익뿐 아니라 보조상의 영업활동을 보호하기 위하여도 다양한 권리를 인정한다.'},
+ {t:'권리',k:'ox',q:'위탁매매인이 개입권을 행사하면 위탁자에게 보수를 청구할 수 없다.',a:'X',why:'개입권을 행사한 경우에도 보수 청구가 가능해요.',src:'이 경우에도 위탁매매인은 위탁자에게 보수를 청구할 수 있다.'},
+ {t:'대리상',k:'cls',q:'허락 없이 자기나 제3자의 이익을 위해 본인의 영업 부류에 속한 거래를 해서는 안 됨',a:'대리상',why:'대리상의 신뢰 의무로 지문에 나와요.',src:'본인의 허락 없이 대리상 자신이나 제3자의 이익을 위해 본인의 영업 부류에 속한 거래를 하는 등 신뢰를 해치는 행위를 해서는 안 된다.'},
+ {t:'위탁매매인',k:'cls',q:'매매를 마친 뒤 지체없이 알리고 계산서를 제출할 의무',a:'위탁매매인',why:'계산서 제출은 위탁매매인의 의무예요. (대리상도 지체없이 통지할 의무는 있지만 계산서 제출은 위탁매매인에 대해 나와요.)',src:'위탁매매인은 위탁받은 매매를 마친 때에는 그 내용을 지체없이 위탁자에게 알리고, 계산서를 제출하여야 한다.'},
+ {t:'보조상',k:'cls',q:'다른 상인의 영업활동을 보조하는 독립된 상인',a:'둘 다',why:'대리상과 위탁매매인 모두 독립된 상인인 보조상이에요.',src:'이들은 모두 독립된 상인이라는 점은 같지만'},
+ {t:'사례',k:'mc',q:'22번 <보기>: 을이 B를 위해 자기 명의로 구리를 매입했다. 이 거래의 이익은 누구에게?',o:['을','B','A'],a:'B',why:'을은 위탁매매인(자기 명의, B의 계산) → 이익은 위탁자 B에게. (22번 ⑤가 적절하지 않음)',src:'그 거래의 이익과 손해가 위탁자에게 귀속된다'},
+ {t:'사례',k:'mc',q:'22번 <보기>: 갑이 A의 명의로 을과 계약했다. 이 계약의 당사자(갑 쪽)는?',o:['갑','A','B'],a:'A',why:'갑은 A의 체약대리상 → 본인 A가 계약 당사자.',src:'체약대리상은 … 본인의 명의로써 의사표시를 하고 그 법률효과가 직접 본인에게 귀속된다.'},
+ {t:'어휘',k:'mc',q:'“비용과 위험 부담이 ⓐ따를 수 있다”의 ‘따르다’와 의미가 가장 가까운 것은?',o:['이 일에는 많은 어려움이 따를 것이다.','선생님의 권유에 따라 공부를 시작하였다.','머리 좋기로는 내 친구를 따를 사람이 없다.'],a:'이 일에는 많은 어려움이 따를 것이다.',why:'‘어떤 일이 다른 일과 더불어 일어나다’의 뜻이에요. (23번 ①)',src:'모든 영업활동을 직접 수행하는 데에 비용과 위험 부담이 ⓐ따를 수 있다.'}
+];
+const $=s=>document.querySelector(s);
+const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+$('#cards').innerHTML=MIS.map((m,i)=>`<div class="card" id="mc${i}"><div class="t">${i+1}. ${esc(m[0])}</div><div class="wrong">✗ ${esc(m[1])}</div>
+  <div class="right"><div class="ok">○ ${esc(m[2])}</div><div class="src">지문: ${esc(m[3])}</div><div class="tip">기억 팁: ${esc(m[4])}</div></div>
+  <button data-i="${i}">어디가 틀렸을까? 바로잡기 보기</button></div>`).join('');
+$('#cards').addEventListener('click',e=>{const b=e.target.closest('button'); if(!b) return; const c=b.parentElement; c.classList.toggle('open'); b.textContent=c.classList.contains('open')?'접기':'어디가 틀렸을까? 바로잡기 보기';});
+
+const TAGS=['전체',...new Set(Q.map(q=>q.t))];
+let pool=[],idx=0,answered=false,wrong=[],stats={},filter='전체';
+function opts(q){ return q.k==='ox'?['O','X']:q.k==='cls'?['대리상','위탁매매인','둘 다']:q.o; }
+function start(list){ pool=list.slice(); idx=0; wrong=[]; stats={}; render(); }
+function render(){
+  const pf=$('#progfill'), pt=$('#progtxt');
+  if(idx>=pool.length){ pf.style.width='100%'; pt.textContent=`${pool.length}/${pool.length}`; return result(); }
+  pf.style.width=(idx/pool.length*100)+'%'; pt.textContent=`${idx+1}/${pool.length}`;
+  const q=pool[idx]; answered=false;
+  const lab=q.k==='ox'?'O / X':q.k==='cls'?'누구의 권리·의무일까?':'고르기';
+  $('#quiz').innerHTML=`<span class="tag">${esc(q.t)} · ${lab}</span><div class="q">${esc(q.q)}</div>
+   <div class="opts">${opts(q).map(o=>`<button data-o="${esc(o)}">${esc(o)}</button>`).join('')}</div><div id="fbx"></div>`;
+}
+function result(){
+  const total=pool.length, right=total-wrong.length;
+  const rows=Object.entries(stats).map(([t,[r,n]])=>`<tr><td class="${r<n?'weak':''}">${esc(t)}${r<n?' (다시 보기)':''}</td><td class="n">${r} / ${n}</td></tr>`).join('');
+  $('#quiz').innerHTML=`<div class="res"><h4>${right} / ${total} 정답</h4>
+   <p>${wrong.length?'빨간 항목이 아직 헷갈리는 개념이에요. 틀린 문제만 다시 풀어 보세요.':'모두 맞혔어요! 헷갈리던 지점이 확실히 정리됐네요.'}</p>
+   <table><tr><th>개념</th><th style="text-align:right">맞힌 수</th></tr>${rows}</table>
+   <div class="nav">${wrong.length?'<button id="retry">틀린 문제만 다시 풀기</button>':''}<button id="again">처음부터 다시</button></div></div>`;
+  const w=wrong.slice(); if($('#retry')) $('#retry').onclick=()=>start(w); $('#again').onclick=()=>start(cur());
+}
+function cur(){ return filter==='전체'?Q:Q.filter(q=>q.t===filter); }
+$('#quiz').addEventListener('click',e=>{
+  const b=e.target.closest('button[data-o]');
+  if(b&&!answered){ answered=true; const q=pool[idx], ok=b.dataset.o===q.a;
+    [...document.querySelectorAll('#quiz .opts button')].forEach(x=>{ if(x.dataset.o===q.a) x.classList.add('good'); else if(x===b) x.classList.add('badc'); x.disabled=true; });
+    const s=stats[q.t]||[0,0]; s[1]++; if(ok) s[0]++; stats[q.t]=s; if(!ok) wrong.push(q);
+    $('#fbx').innerHTML=`<div class="fb ${ok?'ok':'no'}"><b>${ok?'정답!':'아쉬워요. 정답: '+esc(q.a)}</b><div>${esc(q.why)}</div><div class="src">지문 근거: “${esc(q.src)}”</div></div>
+      <div class="nav"><button id="nextq">${idx+1<pool.length?'다음 문제 →':'결과 보기'}</button></div>`;
+    $('#nextq').focus(); return; }
+  if(e.target.id==='nextq'){ idx++; render(); }
+});
+$('#filters').innerHTML=TAGS.map(t=>`<button data-t="${esc(t)}" class="${t==='전체'?'on':''}">${esc(t)}</button>`).join('');
+$('#filters').addEventListener('click',e=>{const b=e.target.closest('button'); if(!b) return; filter=b.dataset.t; [...$('#filters').children].forEach(x=>x.classList.toggle('on',x===b)); start(cur());});
+start(Q);
+}
+</script>
+
+<script>
+'use strict';
+const W = 1920, H = 1080;
+const FONT = '"Noto Sans KR","Noto Sans CJK KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif';
+const C = {
+  bg:'#0b1220', panel:'#121b2d', panel2:'#1a2640', line:'#2b3a57', text:'#e5e7eb', sub:'#94a3b8',
+  N:'#ef4444', S:'#3b82f6', field:'#fde047', A:'#fb923c', B:'#4ade80', Cc:'#c084fc',
+  accent:'#38bdf8', stator:'#4b5b74', statorDark:'#3a4860', rotor:'#2a3547', gold:'#fbbf24', good:'#34d399', bad:'#f87171'
+};
+const PH = {A:C.A, B:C.B, C:C.Cc};
+const D2R = Math.PI/180;
+const clamp = (x,a=0,b=1)=>Math.max(a,Math.min(b,x));
+const ease = t=>{t=clamp(t);return t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;};
+const fin = (lt,s,d=0.8)=>ease((lt-s)/d);
+const fout = (lt,s,d=0.8)=>1-ease((lt-s)/d);
+const lerp = (a,b,t)=>a+(b-a)*t;
+const P = (cx,cy,r,deg)=>[cx+r*Math.cos(deg*D2R), cy-r*Math.sin(deg*D2R)];
+const font = (sz,w=500)=>`${w} ${sz}px ${FONT}`;
+
+function txt(ctx,s,x,y,o={}){
+  const {size=28,color=C.text,align='left',base='alphabetic',weight=500,alpha=1}=o;
+  if(alpha<=0) return;
+  ctx.save(); ctx.globalAlpha*=alpha; ctx.font=font(size,weight); ctx.fillStyle=color;
+  ctx.textAlign=align; ctx.textBaseline=base; ctx.fillText(s,x,y); ctx.restore();
+}
+function wrap(ctx,s,maxW){
+  const out=[];
+  for(const para of s.split('\n')){
+    const words=para.split(' '); let line='';
+    for(const w of words){
+      const test=line?line+' '+w:w;
+      if(ctx.measureText(test).width<=maxW){line=test;continue;}
+      if(line) out.push(line);
+      if(ctx.measureText(w).width>maxW){ // break long word by chars
+        let cur='';
+        for(const ch of w){ if(ctx.measureText(cur+ch).width>maxW){out.push(cur);cur=ch;} else cur+=ch; }
+        line=cur;
+      } else line=w;
+    }
+    out.push(line);
+  }
+  return out;
+}
+function para(ctx,s,x,y,maxW,o={}){
+  const {size=26,lh=1.55,color=C.text,weight=400,alpha=1,align='left'}=o;
+  ctx.save(); ctx.font=font(size,weight);
+  const lines=wrap(ctx,s,maxW);
+  ctx.globalAlpha*=alpha; ctx.fillStyle=color; ctx.textAlign=align; ctx.textBaseline='top';
+  lines.forEach((l,i)=>ctx.fillText(l,x,y+i*size*lh));
+  ctx.restore();
+  return lines.length*size*lh;
+}
+function rr(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
+function arrow(ctx,x1,y1,x2,y2,o={}){
+  const {color='#fff',width=4,head=16,alpha=1,dash=null}=o;
+  if(alpha<=0) return;
+  const a=Math.atan2(y2-y1,x2-x1), len=Math.hypot(x2-x1,y2-y1);
+  const hh=Math.min(head,len*0.6);
+  ctx.save(); ctx.globalAlpha*=alpha; ctx.strokeStyle=color; ctx.fillStyle=color; ctx.lineWidth=width; ctx.lineCap='round';
+  if(dash) ctx.setLineDash(dash);
+  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2-Math.cos(a)*hh*0.8,y2-Math.sin(a)*hh*0.8); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.beginPath(); ctx.moveTo(x2,y2);
+  ctx.lineTo(x2-hh*Math.cos(a-0.45),y2-hh*Math.sin(a-0.45));
+  ctx.lineTo(x2-hh*Math.cos(a+0.45),y2-hh*Math.sin(a+0.45)); ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+// arc arrow in math degrees from a1 to a2 (direction follows sign of a2-a1)
+function arcArrow(ctx,cx,cy,r,a1,a2,o={}){
+  const {color='#fff',width=4,head=16,alpha=1}=o;
+  if(alpha<=0) return;
+  ctx.save(); ctx.globalAlpha*=alpha; ctx.strokeStyle=color; ctx.fillStyle=color; ctx.lineWidth=width; ctx.lineCap='round';
+  const dir=Math.sign(a2-a1)||1; const back=(head*0.8/r)/D2R*dir;
+  ctx.beginPath(); ctx.arc(cx,cy,r,-a1*D2R,-(a2-back)*D2R,dir>0); ctx.stroke();
+  const [ex,ey]=P(cx,cy,r,a2); const tang=(a2*D2R)+dir*Math.PI/2; // direction of motion (math)
+  const tx=Math.cos(tang), ty=-Math.sin(tang); const ang=Math.atan2(ty,tx);
+  ctx.beginPath(); ctx.moveTo(ex,ey);
+  ctx.lineTo(ex-head*Math.cos(ang-0.45),ey-head*Math.sin(ang-0.45));
+  ctx.lineTo(ex-head*Math.cos(ang+0.45),ey-head*Math.sin(ang+0.45)); ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+function badge(ctx,x,y,label,color,o={}){
+  const {r=24,alpha=1,dashed=false,size=26,fill=null}=o;
+  if(alpha<=0) return;
+  ctx.save(); ctx.globalAlpha*=alpha;
+  ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2);
+  ctx.fillStyle=fill||color; ctx.fill();
+  if(dashed){ctx.setLineDash([5,4]); ctx.strokeStyle='#fff'; ctx.lineWidth=2.5; ctx.stroke();}
+  ctx.restore();
+  txt(ctx,label,x,y+1,{size,weight:900,align:'center',base:'middle',alpha,color:'#fff'});
+}
+// symbols ⊙ / ⊗
+function curSym(ctx,x,y,r,out,o={}){
+  const {alpha=1,color='#fff',bg='#0b1220'}=o; if(alpha<=0) return;
+  ctx.save(); ctx.globalAlpha*=alpha; ctx.lineWidth=Math.max(2,r*0.16); ctx.strokeStyle=color; ctx.fillStyle=bg;
+  ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle=color;
+  if(out){ ctx.beginPath(); ctx.arc(x,y,r*0.28,0,Math.PI*2); ctx.fill(); }
+  else { const k=r*0.62; ctx.beginPath(); ctx.moveTo(x-k,y-k); ctx.lineTo(x+k,y+k); ctx.moveTo(x+k,y-k); ctx.lineTo(x-k,y+k); ctx.stroke(); }
+  ctx.restore();
+}
+// polyline helper with dash animation
+function poly(ctx,pts,o={}){
+  const {color=C.field,width=2.5,alpha=1,dash=null,offset=0}=o; if(alpha<=0||pts.length<2) return;
+  ctx.save(); ctx.globalAlpha*=alpha; ctx.strokeStyle=color; ctx.lineWidth=width; ctx.lineJoin='round'; ctx.lineCap='round';
+  if(dash){ctx.setLineDash(dash); ctx.lineDashOffset=offset;}
+  ctx.beginPath(); ctx.moveTo(pts[0][0],pts[0][1]); for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i][0],pts[i][1]); ctx.stroke();
+  ctx.restore();
+}
+function headAlong(ctx,pts,frac,o={}){
+  if(pts.length<4) return;
+  const {color=C.field,size=13,alpha=1}=o;
+  let total=0; const seg=[]; for(let i=1;i<pts.length;i++){const d=Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1]); seg.push(d); total+=d;}
+  let target=total*frac, i=0; while(i<seg.length-1&&target>seg[i]){target-=seg[i];i++;}
+  const a=pts[i], b=pts[i+1]; const t=seg[i]?target/seg[i]:0; const x=lerp(a[0],b[0],t), y=lerp(a[1],b[1],t);
+  const ang=Math.atan2(b[1]-a[1],b[0]-a[0]);
+  ctx.save(); ctx.globalAlpha*=alpha; ctx.fillStyle=color; ctx.beginPath();
+  ctx.moveTo(x+size*0.6*Math.cos(ang),y+size*0.6*Math.sin(ang));
+  ctx.lineTo(x-size*0.6*Math.cos(ang)+size*0.5*Math.cos(ang+Math.PI/2),y-size*0.6*Math.sin(ang)+size*0.5*Math.sin(ang+Math.PI/2));
+  ctx.lineTo(x-size*0.6*Math.cos(ang)-size*0.5*Math.cos(ang+Math.PI/2),y-size*0.6*Math.sin(ang)-size*0.5*Math.sin(ang+Math.PI/2));
+  ctx.closePath(); ctx.fill(); ctx.restore();
+}
+function box(ctx,x,y,w,h,o={}){
+  const {fill=C.panel2,stroke=C.line,r=14,alpha=1,lw=2}=o; if(alpha<=0) return;
+  ctx.save(); ctx.globalAlpha*=alpha; rr(ctx,x,y,w,h,r); ctx.fillStyle=fill; ctx.fill(); if(stroke){ctx.strokeStyle=stroke; ctx.lineWidth=lw; ctx.stroke();} ctx.restore();
+}
+
+
+const K={paper:'#fbf5e6', ink:'#2b2116'};
+function bubble(ctx,x,y,w,text,o={}){
+  const {tail=null,size=25,who=null,whoColor='#334155',alpha=1,fill=K.paper,ink=K.ink,think=false}=o;
+  if(alpha<=0) return 0;
+  ctx.save(); ctx.font=font(size,500); const lines=wrap(ctx,text,w-36); ctx.restore();
+  const head=who?30:0, h=lines.length*size*1.45+28+head;
+  ctx.save(); ctx.globalAlpha*=alpha;
+  if(tail&&!think){ const bx=clamp(tail[0],x+30,x+w-30), by=tail[1]>y+h/2?y+h-2:y+2;
+    ctx.beginPath(); ctx.moveTo(bx-16,by); ctx.lineTo(tail[0],tail[1]); ctx.lineTo(bx+16,by); ctx.closePath(); ctx.fillStyle=fill; ctx.fill(); }
+  if(tail&&think){ for(let k=1;k<=3;k++){ const f=k/4; ctx.beginPath(); ctx.arc(lerp(tail[0],x+w/2,1-f*0.9),lerp(tail[1],y+h,1-f*0.9),4+k*3,0,Math.PI*2); ctx.fillStyle=fill; ctx.fill(); } }
+  rr(ctx,x,y,w,h,think?h/2.6:18); ctx.fillStyle=fill; ctx.shadowColor='rgba(0,0,0,.35)'; ctx.shadowBlur=14; ctx.fill(); ctx.shadowBlur=0;
+  if(think){ ctx.setLineDash([7,6]); ctx.strokeStyle='#94a3b8'; ctx.lineWidth=2; ctx.stroke(); ctx.setLineDash([]); }
+  ctx.restore();
+  if(who) txt(ctx,who,x+18,y+30,{size:21,weight:900,color:whoColor,alpha});
+  ctx.save(); ctx.globalAlpha*=alpha; ctx.font=font(size,500); ctx.fillStyle=ink; ctx.textBaseline='top';
+  lines.forEach((l,i)=>ctx.fillText(l,x+18,y+14+head+i*size*1.45)); ctx.restore();
+  return h;
+}
+function chip(ctx,x,y,text,color,o={}){ const {alpha=1,size=24,fill='rgba(15,23,42,.9)',align='left'}=o; if(alpha<=0) return 0;
+  ctx.save(); ctx.font=font(size,700); const w=ctx.measureText(text).width+34; ctx.restore();
+  const xx=align==='center'?x-w/2:x;
+  box(ctx,xx,y,w,size+22,{fill,stroke:color,r:(size+22)/2,alpha}); txt(ctx,text,xx+17,y+size+5,{size,weight:700,color,alpha}); return w; }
+function stamp(ctx,x,y,text,color,k){ if(k<=0) return; const s=lerp(1.8,1,ease(k));
+  ctx.save(); ctx.globalAlpha*=clamp(k*2); ctx.translate(x,y); ctx.rotate(-0.12); ctx.scale(s,s);
+  ctx.strokeStyle=color; ctx.lineWidth=6; rr(ctx,-90,-42,180,84,12); ctx.stroke(); ctx.restore();
+  ctx.save(); ctx.globalAlpha*=clamp(k*2); ctx.translate(x,y); ctx.rotate(-0.12); ctx.scale(s,s); txt(ctx,text,0,16,{size:44,weight:900,align:'center',color}); ctx.restore(); }
+
+/* ---------- backgrounds (scene area 30..1170 × 120..910) ---------- */
+
+/* ================= 대리 · 보조상 ILLUSTRATION KIT ================= */
+const HEADER_TAG='2026 10월 고1 학평 국어 [18~23] · 민법의 대리 / 상법의 보조상';
+const R={bonin:'#60a5fa', agent:'#fbbf24', other:'#4ade80', law:'#c084fc', consign:'#fb923c', bad:'#f87171', gold:'#fde047'};
+
+function who(ctx,x,y,s,o={}){
+  const {color=R.bonin,label=null,sub=null,alpha=1,glow=0,hair='#1f2937',think=null,face=1,tagY=14}=o;
+  if(alpha<=0) return;
+  ctx.save(); ctx.globalAlpha*=alpha; ctx.translate(x,y); ctx.scale(s,s);
+  if(glow>0){ ctx.save(); ctx.globalAlpha*=glow; ctx.beginPath(); ctx.ellipse(0,-70,80,100,0,0,Math.PI*2); const g=ctx.createRadialGradient(0,-70,10,0,-70,100); g.addColorStop(0,color); g.addColorStop(1,'rgba(0,0,0,0)'); ctx.fillStyle=g; ctx.fill(); ctx.restore(); }
+  ctx.beginPath(); ctx.moveTo(-42,0); ctx.lineTo(-42,-52); ctx.quadraticCurveTo(-42,-92,0,-92); ctx.quadraticCurveTo(42,-92,42,-52); ctx.lineTo(42,0); ctx.closePath();
+  ctx.fillStyle=color; ctx.fill(); ctx.lineWidth=3; ctx.strokeStyle='rgba(0,0,0,.35)'; ctx.stroke();
+  ctx.beginPath(); ctx.arc(0,-122,27,0,Math.PI*2); ctx.fillStyle='#f2cfa8'; ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.arc(0,-128,28,Math.PI*1.05,Math.PI*1.95); ctx.fillStyle=hair; ctx.fill();
+  ctx.fillStyle='#1f2937'; ctx.beginPath(); ctx.arc(-9*face+4*face,-120,3.2,0,Math.PI*2); ctx.arc(9*face+4*face,-120,3.2,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle='#1f2937'; ctx.lineWidth=2.5; ctx.beginPath(); ctx.arc(4*face,-112,7,0.2,Math.PI-0.2); ctx.stroke();
+  ctx.restore();
+  if(label){ const w=chipW(label,22)+0; box(ctx,x-w/2,y+tagY,w,36,{fill:'rgba(15,23,42,.92)',stroke:color,r:18,alpha}); txt(ctx,label,x,y+tagY+26,{size:22,weight:900,align:'center',color,alpha}); }
+  if(sub) txt(ctx,sub,x,y+tagY+66,{size:19,align:'center',color:'#cbd5e1',alpha});
+}
+function chipW(t,size){ const c=document.getElementById('cv').getContext('2d'); c.save(); c.font=font(size,900); const w=c.measureText(t).width+30; c.restore(); return w; }
+function shop(ctx,x,y,s,o={}){ const {color='#38bdf8',label=null,sub=null,alpha=1}=o; if(alpha<=0) return;
+  ctx.save(); ctx.globalAlpha*=alpha; ctx.translate(x,y); ctx.scale(s,s);
+  ctx.fillStyle='#e2e8f0'; ctx.fillRect(-70,-110,140,110); ctx.fillStyle='#334155'; ctx.fillRect(-22,-60,44,60);
+  ctx.fillStyle='#93c5fd'; ctx.fillRect(-58,-80,26,24); ctx.fillRect(32,-80,26,24);
+  for(let k=0;k<6;k++){ ctx.fillStyle=k%2?'#fff':color; ctx.beginPath(); ctx.moveTo(-80+k*26.6,-110); ctx.lineTo(-80+(k+1)*26.6,-110); ctx.lineTo(-80+(k+1)*26.6,-92); ctx.quadraticCurveTo(-80+(k+0.5)*26.6,-82,-80+k*26.6,-92); ctx.closePath(); ctx.fill(); }
+  ctx.fillStyle=color; ctx.fillRect(-80,-140,160,32); ctx.restore();
+  if(label){ const w=chipW(label,22); box(ctx,x-w/2,y+14,w,36,{fill:'rgba(15,23,42,.92)',stroke:color,r:18,alpha}); txt(ctx,label,x,y+40,{size:22,weight:900,align:'center',color,alpha}); }
+  if(sub) txt(ctx,sub,x,y+80,{size:19,align:'center',color:'#cbd5e1',alpha}); }
+function doc(ctx,x,y,o={}){ const {name='',signer='',alpha=1,w=170,h=210,title='계약서',hl=0,pre='명의: '}=o; if(alpha<=0) return;
+  ctx.save(); ctx.globalAlpha*=alpha; ctx.translate(x,y); ctx.rotate(-0.04);
+  ctx.shadowColor='rgba(0,0,0,.4)'; ctx.shadowBlur=16; ctx.fillStyle='#fffbeb'; ctx.fillRect(-w/2,-h/2,w,h); ctx.shadowBlur=0;
+  ctx.restore();
+  txt(ctx,title,x,y-h/2+38,{size:24,weight:900,align:'center',color:'#1f2937',alpha});
+  ctx.save(); ctx.globalAlpha*=alpha*0.35; ctx.fillStyle='#64748b'; for(let k=0;k<3;k++) ctx.fillRect(x-w/2+20,y-h/2+56+k*16,w-40,5); ctx.restore();
+  if(hl>0){ box(ctx,x-w/2+8,y+2,w-16,38,{fill:`rgba(253,224,71,${0.45*hl})`,stroke:null,r:6,alpha}); }
+  txt(ctx,pre+name,x-w/2+16,y+30,{size:21,weight:900,color:'#9a3412',alpha});
+  if(signer) txt(ctx,'서명한 사람: '+signer,x-w/2+16,y+70,{size:18,weight:700,color:'#334155',alpha}); }
+function coin(ctx,x,y,r,t,o={}){ const {alpha=1,col='#facc15'}=o; if(alpha<=0) return; ctx.save(); ctx.globalAlpha*=alpha; ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fillStyle=col; ctx.fill(); ctx.lineWidth=3; ctx.strokeStyle='#a16207'; ctx.stroke(); ctx.restore(); txt(ctx,t,x,y+r*0.36,{size:r,weight:900,align:'center',color:'#713f12',alpha}); }
+function qpt(p0,p1,p2,t){ return [(1-t)*(1-t)*p0[0]+2*(1-t)*t*p1[0]+t*t*p2[0],(1-t)*(1-t)*p0[1]+2*(1-t)*t*p1[1]+t*t*p2[1]]; }
+function flow(ctx,a,b,o={}){ const {color='#fff',label=null,lt=0,bend=0,alpha=1,width=5,dash=null,dot=true,labelT=0.5,size=22,head=18}=o; if(alpha<=0) return;
+  const mx=(a[0]+b[0])/2, my=(a[1]+b[1])/2, dx=b[0]-a[0], dy=b[1]-a[1], L=Math.hypot(dx,dy)||1; const c=[mx-dy/L*bend, my+dx/L*bend];
+  ctx.save(); ctx.globalAlpha*=alpha; ctx.strokeStyle=color; ctx.lineWidth=width; ctx.lineCap='round'; if(dash) ctx.setLineDash(dash);
+  const e=qpt(a,c,b,0.95); ctx.beginPath(); ctx.moveTo(a[0],a[1]); ctx.quadraticCurveTo(c[0],c[1],e[0],e[1]); ctx.stroke(); ctx.setLineDash([]); ctx.restore();
+  const p=qpt(a,c,b,0.9); arrow(ctx,p[0],p[1],b[0],b[1],{color,width,head,alpha});
+  if(dot){ const t=(lt*0.6)%1; const d=qpt(a,c,b,t); ctx.save(); ctx.globalAlpha*=alpha; ctx.beginPath(); ctx.arc(d[0],d[1],7,0,Math.PI*2); ctx.fillStyle='#fff'; ctx.fill(); ctx.restore(); }
+  if(label){ const q=qpt(a,c,b,labelT); chip(ctx,q[0],q[1]-(size+22)/2,label,color,{alpha,align:'center',size}); } }
+function laptop(ctx,x,y,s,alpha=1){ ctx.save(); ctx.globalAlpha*=alpha; ctx.translate(x,y); ctx.scale(s,s); ctx.fillStyle='#94a3b8'; rr(ctx,-40,-56,80,52,6); ctx.fill(); ctx.fillStyle='#0ea5e9'; ctx.fillRect(-34,-50,68,40); ctx.fillStyle='#cbd5e1'; ctx.beginPath(); ctx.moveTo(-52,0); ctx.lineTo(52,0); ctx.lineTo(40,-6); ctx.lineTo(-40,-6); ctx.closePath(); ctx.fill(); ctx.restore(); }
+function scale(ctx,x,y,tilt,alpha=1,lab=['',''],cols=['#fff','#fff']){ if(alpha<=0) return; ctx.save(); ctx.globalAlpha*=alpha; ctx.strokeStyle='#e2e8f0'; ctx.lineWidth=6; ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x,y-200); ctx.stroke(); ctx.fillStyle='#e2e8f0'; ctx.fillRect(x-60,y,120,12);
+  ctx.translate(x,y-200); ctx.rotate(tilt); ctx.beginPath(); ctx.moveTo(-170,0); ctx.lineTo(170,0); ctx.stroke();
+  for(const [sx,i] of [[-170,0],[170,1]]){ ctx.save(); ctx.translate(sx,0); ctx.rotate(-tilt); ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(-50,90); ctx.moveTo(0,0); ctx.lineTo(50,90); ctx.stroke(); ctx.fillStyle=cols[i]; ctx.beginPath(); ctx.ellipse(0,92,64,14,0,0,Math.PI*2); ctx.fill(); ctx.restore(); }
+  ctx.restore();
+  for(const [sx,i] of [[-170,0],[170,1]]){ const yy=y-200+Math.sin(tilt)*sx; txt(ctx,lab[i],x+sx*Math.cos(tilt),yy+140,{size:22,weight:900,align:'center',color:cols[i],alpha}); } }
+function panelBox(ctx,x,y,w,h,title,col,alpha=1){ box(ctx,x,y,w,h,{fill:'#131d33',stroke:col,alpha,r:16,lw:2.5}); if(title) txt(ctx,title,x+w/2,y+40,{size:27,weight:900,align:'center',color:col,alpha}); }
+function trap(ctx,x,y,w,wrong,right,alpha=1){ if(alpha<=0) return; box(ctx,x,y,w,128,{fill:'rgba(69,10,10,.92)',stroke:R.bad,alpha,r:14});
+  txt(ctx,'✗ '+wrong,x+20,y+44,{size:23,weight:700,color:'#fecaca',alpha}); txt(ctx,'○ '+right,x+20,y+96,{size:23,weight:900,color:'#bbf7d0',alpha}); }
+const BG=(ctx)=>{ ctx.fillStyle='#0e1628'; ctx.fillRect(0,120,1200,800); ctx.save(); ctx.globalAlpha=0.06; ctx.strokeStyle='#94a3b8'; ctx.lineWidth=1; for(let x=30;x<1200;x+=40){ctx.beginPath(); ctx.moveTo(x,120); ctx.lineTo(x,920); ctx.stroke();} for(let y=120;y<920;y+=40){ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(1200,y); ctx.stroke();} ctx.restore(); };
+const sub2=(lt,a,b)=>lt>=a&&lt<b;
+const vis=(lt,a,b,d=0.6)=>fin(lt,a,d)*fout(lt,b-d,d);
+
+/* ================= SCENES ================= */
+const SCENES=[];
+// 0 INTRO
+SCENES.push({title:'민법의 대리 · 상법의 보조상, 그림으로 이해하기', short:'시작', dur:22, full:true,
+  steps:[[0,'2026학년도 10월 고1 학평 국어 [18~23] 지문의 개념을 예시와 함께 하나씩 그림으로 살펴봅시다.'],[9,'(가)는 민법의 ‘대리’, (나)는 상법의 ‘보조상’이에요. 둘 다 “다른 사람을 통해 거래하는 방법”이라는 공통점이 있어요.']],
+  draw(ctx,lt){ ctx.fillStyle='#0b1220'; ctx.fillRect(0,114,1920,800);
+    const a=fin(lt,0.2,1);
+    txt(ctx,'2026학년도 10월 고1 전국연합학력평가 · 국어 [18~23]',100,250,{size:30,weight:700,color:'#38bdf8',alpha:a});
+    txt(ctx,'대리와 보조상',95,350,{size:92,weight:900,alpha:a});
+    txt(ctx,'“다른 사람을 통해 거래하기” — 누가 말하고, 누구 이름으로, 누구에게 효과가?',100,420,{size:30,color:'#cbd5e1',alpha:a});
+    const L=[['(가) 민법의 대리',R.agent,['사적 자치 · 대리의 기능','본인 · 대리인 · 상대방','임의대리 / 법정대리 · 대리권 · 수권행위','현명주의와 예외','자기계약 / 쌍방대리 금지와 예외']],
+             ['(나) 상법의 보조상',R.consign,['보조상 = 독립된 상인','대리상: 체약대리상 / 중개대리상','위탁매매인: 자기 명의 + 타인의 계산','보조상의 의무','유치권 · 보상청구권 · 개입권']]];
+    L.forEach(([t,col,items],i)=>{ const x=100+i*600, b=fin(lt,1.2+i*1.2,0.7); box(ctx,x,480,560,380,{fill:'#131d33',stroke:col,alpha:b});
+      txt(ctx,t,x+30,530,{size:32,weight:900,color:col,alpha:b}); items.forEach((s,k)=>txt(ctx,'· '+s,x+30,590+k*54,{size:25,alpha:b*fin(lt,2+i*1.2+k*0.35,0.5)})); });
+    const c=fin(lt,9,0.8);
+    who(ctx,1420,560,1.1,{color:R.bonin,label:'본인',alpha:c}); who(ctx,1600,400,1.1,{color:R.agent,label:'대리인',alpha:c}); who(ctx,1780,560,1.1,{color:R.other,label:'상대방',alpha:c});
+    flow(ctx,[1640,330],[1750,430],{color:R.agent,lt,alpha:c,bend:-20,width:4,head:14}); flow(ctx,[1760,640],[1440,640],{color:R.gold,lt,alpha:c,bend:-60,width:4,head:14,dash:[10,8]});
+    txt(ctx,'의사표시',1760,360,{size:22,weight:700,color:R.agent,alpha:c}); txt(ctx,'법률효과',1600,760,{size:22,weight:700,align:'center',color:R.gold,alpha:c});
+  }});
+
+// 1 사적 자치 & 대리의 기능
+SCENES.push({title:'사적 자치와 대리의 필요성', short:'① 사적 자치', dur:38,
+  quote:'민법은 개인이 법률행위를 통해 자신의 법률관계를 그 의사에 따라 자유롭게 형성할 수 있다는 사적 자치의 원칙을 기초로 한다. … 대리는 … 사적 자치를 확장하거나 보충하는 기능을 한다.',
+  bullets:[[0,'사적 자치: 내 법률관계는 내 의사에 따라 자유롭게'],[10,'현실: 직접 법률행위를 하기 어려운 상황이 있음'],[19,'대리: 다른 사람이 대신 법률행위 → 효과는 나에게'],[28,'예: 매매 계약 체결, 공적 서류 발급, 행정 기관 신고'],[32,'기능: 사적 자치의 확장 · 보충']],
+  steps:[[0,'예를 들어 볼게요. 지민이는 중고 노트북을 사고 싶어요. 누구와, 얼마에 살지는 지민이가 스스로 정할 수 있죠. 이것이 ‘사적 자치’예요.'],
+         [10,'그런데 지민이가 해외에 있어서 직접 판매자를 만날 수 없다면? 현실에서는 직접 법률행위를 하기 어려운 상황이 생겨요.'],
+         [19,'그래서 민법은 ‘대리’를 둬요. 삼촌이 지민이를 대신해 계약을 하고, 그 효과(노트북의 주인이 되고 대금을 낼 의무)는 지민이에게 돌아가요.'],
+         [28,'매매 계약 체결, 공적 서류 발급, 행정 기관에 하는 신고 등을 다른 사람을 통해 할 수 있으니, 대리는 사적 자치를 ‘확장하거나 보충’해 줘요.']],
+  draw(ctx,lt){ BG(ctx);
+    who(ctx,250,640,1.3,{color:R.bonin,label:'지민',alpha:1});
+    who(ctx,950,640,1.3,{color:R.other,label:'판매자',alpha:1}); laptop(ctx,950,420,1.4);
+    if(lt<10.3){ const b=vis(lt,0.3,10.3); flow(ctx,[330,500],[870,500],{color:'#fff',label:'내 의사로 계약 (법률행위)',lt,alpha:b,bend:-40});
+      chip(ctx,600,200,'사적 자치의 원칙','#38bdf8',{alpha:fin(lt,3,0.6),align:'center',size:30}); }
+    if(lt>10){ const b=fin(lt,10.3,0.6)*fout(lt,19,0.5);
+      ctx.save(); ctx.globalAlpha*=b; ctx.beginPath(); ctx.arc(250,300,80,0,Math.PI*2); ctx.fillStyle='#1e3a5f'; ctx.fill(); ctx.strokeStyle='#38bdf8'; ctx.lineWidth=3; ctx.stroke();
+      ctx.strokeStyle='#7dd3fc'; ctx.lineWidth=2; ctx.beginPath(); ctx.ellipse(250,300,36,80,0,0,Math.PI*2); ctx.moveTo(170,300); ctx.lineTo(330,300); ctx.stroke(); ctx.restore();
+      txt(ctx,'해외 체류 중',250,420,{size:24,weight:700,align:'center',color:'#7dd3fc',alpha:b});
+      flow(ctx,[340,560],[860,560],{color:R.bad,lt,alpha:b,dash:[12,10],dot:false});
+      txt(ctx,'✗',600,575,{size:80,weight:900,align:'center',color:R.bad,alpha:b});
+      txt(ctx,'직접 하기 어려움',600,640,{size:26,weight:700,align:'center',color:'#fecaca',alpha:b}); }
+    if(lt>19){ const b=fin(lt,19.3,0.6);
+      who(ctx,600,420,1.15,{color:R.agent,label:'삼촌 (대신 계약)',alpha:b});
+      flow(ctx,[660,330],[880,420],{color:R.agent,label:'계약',lt,alpha:b,bend:-30,size:20});
+      flow(ctx,[880,760],[320,760],{color:R.gold,label:'효과는 지민에게',lt,alpha:fin(lt,22,0.6),bend:-40,dash:[12,9]});
+      if(lt>28){ const c=fin(lt,28.3,0.6); ['매매 계약 체결','공적 서류 발급','행정 기관 신고'].forEach((s,i)=>chip(ctx,120+i*330,170,s,'#38bdf8',{alpha:c*fin(lt,28.3+i*0.6,0.5)})); chip(ctx,600,240,'사적 자치의 확장 · 보충','#fde047',{alpha:fin(lt,32,0.6),align:'center',size:28}); } }
+  }});
+
+// 2 세 주체
+SCENES.push({title:'대리의 세 주체: 본인 · 대리인 · 상대방', short:'② 세 주체', dur:42,
+  quote:'대리에서는 법률효과가 귀속되는 자를 본인, 본인을 위한 것임을 표시하고 법률행위를 대신하는 자를 대리인, 대리인과 거래하는 당사자를 상대방이라고 한다.',
+  bullets:[[0,'본인: 법률효과가 귀속되는 자 (지민)'],[7,'대리인: 본인을 위한 것임을 표시하고 법률행위를 대신하는 자 (삼촌)'],[14,'상대방: 대리인과 거래하는 당사자 (판매자)'],[22,'의사표시는 대리인이, 법률효과는 본인에게'],[31,'핵심: 의사표시하는 자 ≠ 효과가 귀속되는 자 (분리)']],
+  steps:[[0,'대리에는 세 사람이 등장해요. 먼저 ‘본인’은 법률효과가 귀속되는 사람, 곧 지민이에요.'],
+         [7,'‘대리인’은 본인을 위한 것임을 표시하고 법률행위를 대신하는 사람, 곧 삼촌이에요.'],
+         [14,'‘상대방’은 대리인과 거래하는 당사자, 곧 노트북 판매자예요.'],
+         [22,'삼촌이 판매자에게 “사겠습니다”라고 의사표시를 하면, 노트북 소유권과 대금 지급 의무라는 법률효과는 지민이에게 생겨요.'],
+         [31,'이처럼 대리에서는 실제로 의사표시를 하는 사람(대리인)과 법률효과가 귀속되는 사람(본인)이 분리돼요. 많은 문제가 이 구분을 묻습니다!']],
+  draw(ctx,lt){ BG(ctx);
+    const A=[230,730], B=[600,500], C=[970,730];
+    who(ctx,A[0],A[1],1.3,{color:R.bonin,label:'본인 = 지민',alpha:fin(lt,0.3,0.6),glow:sub2(lt,0,7)?0.6:0});
+    who(ctx,B[0],B[1],1.3,{color:R.agent,label:'대리인 = 삼촌',alpha:fin(lt,7,0.6),glow:sub2(lt,7,14)?0.6:0});
+    who(ctx,C[0],C[1],1.3,{color:R.other,label:'상대방 = 판매자',alpha:fin(lt,14,0.6),glow:sub2(lt,14,22)?0.6:0});
+    const defs=[[0,'법률효과가 귀속되는 자',A,R.bonin],[7,'본인을 위해 법률행위를 대신하는 자',B,R.agent],[14,'대리인과 거래하는 당사자',C,R.other]];
+    defs.forEach(([t,s,p,col])=>{ const b=vis(lt,t+0.5,22); txt(ctx,s,p[0],p[1]-200,{size:23,weight:700,align:'center',color:col,alpha:b}); });
+    if(lt>22){ const b=fin(lt,22.3,0.6);
+      flow(ctx,[680,430],[930,560],{color:R.agent,label:'의사표시 “사겠습니다”',lt,alpha:b,bend:-50});
+      flow(ctx,[900,820],[310,820],{color:R.gold,label:'법률효과: 소유권 · 대금 지급 의무',lt,alpha:fin(lt,24,0.6),bend:-60,dash:[12,9]});
+      flow(ctx,[300,580],[520,430],{color:R.bonin,label:'대리권',lt,alpha:fin(lt,26,0.6),bend:-40,size:20,dot:false}); }
+    if(lt>31){ const b=fin(lt,31.3,0.6); box(ctx,300,132,600,104,{fill:'rgba(15,23,42,.94)',stroke:R.gold,alpha:b});
+      txt(ctx,'말하는 사람(대리인) ≠ 효과 받는 사람(본인)',600,180,{size:28,weight:900,align:'center',color:R.gold,alpha:b});
+      txt(ctx,'→ “분리”된다',600,220,{size:24,weight:700,align:'center',color:'#fff',alpha:b}); }
+  }});
+
+// 3 대리권, 임의/법정
+SCENES.push({title:'대리권 · 임의대리와 법정대리', short:'③ 임의 / 법정대리', dur:44,
+  quote:'대리에는 본인의 의사에 따라 대리권을 수여하는 임의대리와 법률 규정에 따라 대리권이 주어지는 법정대리가 있다. … 임의대리에서는 본인이 대리인에게 대리권을 수여하는 수권행위에 의해 대리권이 발생한다.',
+  bullets:[[0,'대리권: 대리인이 본인을 위해 의사표시를 하거나 받아 본인에게 효과를 귀속시키는 법률상의 자격'],[11,'임의대리: 본인의 의사로 대리권 수여'],[16,'수권행위: 본인이 대리인에게 대리권을 수여하는 행위'],[24,'법정대리: 법률 규정에 따라 대리권이 주어짐'],[33,'함정: 임의대리 = 법률 규정에 따라 자동 부여 ✗ (19번 ②)']],
+  steps:[[0,'대리권은 대리인이 본인을 위해 상대방에게 의사표시를 하거나 받음으로써 본인에게 법률효과를 귀속시키는 ‘법률상의 자격’이에요. 말할 때뿐 아니라 받을 때도 포함돼요.'],
+         [11,'대리권이 생기는 방식은 두 가지예요. 임의대리는 본인의 의사에 따라 대리권을 줘요. 지민이가 삼촌에게 위임장을 써 주는 것처럼요.'],
+         [16,'이렇게 본인이 대리인에게 대리권을 수여하는 행위를 ‘수권행위’라고 해요. 임의대리의 대리권은 수권행위로 발생해요.'],
+         [24,'법정대리는 본인의 의사가 아니라 법률 규정에 따라 대리권이 주어져요. 예를 들어 미성년 자녀를 대신해 법에 따라 대리하는 부모를 떠올리면 돼요.'],
+         [33,'자주 틀리는 부분! ‘법률 규정에 따라’는 법정대리, ‘본인의 의사·수권행위’는 임의대리예요. 둘을 바꾼 선택지가 19번 ②예요.']],
+  draw(ctx,lt){ BG(ctx);
+    if(lt<11.3){ const b=vis(lt,0.2,11.3);
+      who(ctx,600,560,1.35,{color:R.agent,label:'대리인',alpha:b,glow:0.5});
+      box(ctx,240,170,720,170,{fill:'#131d33',stroke:R.agent,alpha:b});
+      txt(ctx,'대리권 = 법률상의 자격',600,222,{size:34,weight:900,align:'center',color:R.agent,alpha:b});
+      txt(ctx,'본인을 위해 상대방에게 의사표시를 하거나 받음 →',600,272,{size:24,align:'center',alpha:b}); txt(ctx,'본인에게 법률효과를 귀속시킴',600,310,{size:24,align:'center',alpha:b,weight:700,color:R.gold});
+      flow(ctx,[700,460],[960,460],{color:R.agent,label:'하는 의사표시',lt,alpha:fin(lt,4,0.6),size:20}); flow(ctx,[960,560],[700,560],{color:R.other,label:'받는 의사표시',lt,alpha:fin(lt,6,0.6),size:20});
+      who(ctx,1030,640,1,{color:R.other,label:'상대방',alpha:fin(lt,4,0.6)}); return; }
+    const a=fin(lt,11.3,0.6);
+    panelBox(ctx,50,140,540,700,'임의대리',R.bonin,a); panelBox(ctx,610,140,540,700,'법정대리',R.law,fin(lt,24,0.6));
+    who(ctx,170,560,1.1,{color:R.bonin,label:'본인(지민)',alpha:a}); who(ctx,470,560,1.1,{color:R.agent,label:'대리인(삼촌)',alpha:a});
+    txt(ctx,'본인의 의사',320,230,{size:26,weight:900,align:'center',color:'#bfdbfe',alpha:a});
+    const dk=ease((lt-12)/3); const dx=lerp(220,410,dk);
+    doc(ctx,dx,315,{title:'위임장',name:'지민',alpha:a,w:130,h:150});
+    chip(ctx,320,640,'수권행위 → 대리권 발생',R.bonin,{alpha:fin(lt,16,0.6),align:'center',size:24});
+    const c=fin(lt,24,0.6);
+    ctx.save(); ctx.globalAlpha*=c; ctx.strokeStyle=R.law; ctx.lineWidth=6; const sx=880,sy=300; ctx.beginPath(); ctx.moveTo(sx,sy-70); ctx.lineTo(sx,sy+40); ctx.moveTo(sx-90,sy-50); ctx.lineTo(sx+90,sy-50); ctx.stroke();
+    for(const d of [-90,90]){ ctx.beginPath(); ctx.moveTo(sx+d,sy-50); ctx.lineTo(sx+d-30,sy+10); ctx.lineTo(sx+d+30,sy+10); ctx.closePath(); ctx.stroke(); } ctx.restore();
+    txt(ctx,'법률 규정',880,385,{size:26,weight:900,align:'center',color:R.law,alpha:c});
+    who(ctx,740,640,0.8,{color:R.bonin,label:'미성년 자녀(본인)',alpha:c}); who(ctx,1020,640,1.1,{color:R.agent,label:'부모(대리인)',alpha:c});
+    flow(ctx,[900,410],[1000,470],{color:R.law,lt,alpha:c,width:4,head:14});
+    txt(ctx,'(이해를 돕기 위한 예시)',880,445,{size:19,align:'center',color:'#94a3b8',alpha:c});
+    if(lt>33){ trap(ctx,120,710,960,'임의대리는 법률 규정에 따라 대리권이 자동으로 부여된다','임의대리 = 본인의 수권행위 / 법정대리 = 법률 규정',fin(lt,33.3,0.6)); }
+  }});
+
+// 4 현명주의
+SCENES.push({title:'현명주의와 그 예외', short:'④ 현명주의', dur:42,
+  quote:'대리인은 상대방에게 자신이 대리권의 범위 내에서 본인을 위해 법률행위를 한다는 것을 표시하는 ‘현명’을 하여야 한다. … 다만 현명이 없었더라도, 대리인이 본인 대신 법률행위를 했다는 것을 상대방이 알 수 있는 경우에는 예외적으로 그 행위의 법률효과가 본인에게 귀속된다.',
+  bullets:[[0,'현명: 대리인이 “상대방”에게 본인을 위한 행위임을 표시'],[8,'대리권의 범위 내에서 하는 표시'],[13,'현명주의의 역할: 효과가 누구에게 가는지 상대방이 알 수 있게'],[22,'예외: 현명이 없어도 상대방이 알 수 있었다면 → 본인에게 귀속'],[33,'함정: 현명은 본인에게 하는 표시 ✗']],
+  steps:[[0,'대리인은 상대방에게 “나는 대리권의 범위 안에서 본인을 위해 이 계약을 한다”고 밝혀야 해요. 이것이 ‘현명(顯名)’, 이름을 드러낸다는 뜻이에요.'],
+         [8,'삼촌이 판매자에게 “지민이를 대신해서 사는 겁니다”라고 말하는 장면이 바로 현명이에요.'],
+         [13,'현명주의 덕분에 상대방은 계약의 효과가 누구에게 가는지, 곧 진짜 거래 상대가 누구인지 알 수 있어요.'],
+         [22,'예외도 있어요. 삼촌이 말하지 않았더라도, 판매자가 지민이를 위한 거래라는 것을 알 수 있었다면(예: 지민이 이름이 적힌 주문서) 효과는 지민이에게 가요.'],
+         [33,'헷갈리기 쉬운 점: 현명은 ‘상대방’에게 하는 표시예요. 본인에게 알리는 것이 아니에요!']],
+  draw(ctx,lt){ BG(ctx);
+    if(lt<22.3){ const a=fout(lt,21.7,0.6); ctx.save(); ctx.globalAlpha*=a;
+      who(ctx,300,700,1.35,{color:R.agent,label:'대리인(삼촌)'}); who(ctx,900,700,1.35,{color:R.other,label:'상대방(판매자)'});
+      bubble(ctx,140,170,520,'“대리권 범위 안에서, 지민이를 대신해서 사는 겁니다.”',{tail:[330,500],who:'현명',whoColor:'#b45309',alpha:fin(lt,7.5,0.6),size:26});
+      flow(ctx,[400,560],[800,560],{color:R.agent,label:'상대방에게 표시',lt,alpha:fin(lt,8.5,0.6)});
+      if(lt>13){ const b=fin(lt,13.3,0.6); bubble(ctx,680,240,450,'“아, 이 계약의 효과는 지민 씨에게 가는구나.”',{tail:[900,500],who:'상대방이 알게 됨',whoColor:'#15803d',alpha:b,size:24});
+        chip(ctx,600,830,'효과가 누구에게 귀속되는지 상대방이 알 수 있게!',R.gold,{alpha:fin(lt,15,0.6),align:'center',size:24}); }
+      ctx.restore(); return; }
+    const a=fin(lt,22.3,0.6);
+    panelBox(ctx,50,140,540,560,'원칙: 현명 ○',R.other,a); panelBox(ctx,610,140,540,560,'예외: 현명 ✗, 그러나 상대방이 앎',R.gold,a);
+    who(ctx,180,560,0.95,{color:R.agent,label:'삼촌',alpha:a}); who(ctx,460,560,0.95,{color:R.other,label:'판매자',alpha:a});
+    bubble(ctx,90,200,300,'“지민이 대신 삽니다”',{tail:[190,400],alpha:a,size:22});
+    chip(ctx,320,630,'→ 효과: 본인(지민)',R.bonin,{alpha:a,align:'center'});
+    who(ctx,740,560,0.95,{color:R.agent,label:'삼촌',alpha:a}); who(ctx,1020,560,0.95,{color:R.other,label:'판매자',alpha:a});
+    doc(ctx,880,300,{title:'주문서',name:'지민',w:140,h:150,alpha:a,hl:fin(lt,24,0.6)});
+    txt(ctx,'(말은 안 했지만 알 수 있음)',880,430,{size:20,align:'center',color:'#fde68a',alpha:a});
+    chip(ctx,880,630,'→ 예외적으로 본인에게 귀속',R.bonin,{alpha:fin(lt,26,0.6),align:'center'});
+    if(lt>33) trap(ctx,120,730,960,'현명은 대리인이 본인에게 “당신을 위해 하겠다”고 알리는 것','현명은 대리인이 상대방에게 본인을 위한 행위임을 표시하는 것',fin(lt,33.3,0.6));
+  }});
+
+// 5 신뢰와 이익 충돌
+SCENES.push({title:'신뢰 관계와 이익 충돌의 가능성', short:'⑤ 이익 충돌', dur:32,
+  quote:'대리인은 단순히 본인의 의사를 전달하는 자가 아니라 실제로 의사표시를 하는 주체이므로, 경우에 따라 대리인의 사적 이익과 본인의 이익이 충돌할 가능성도 있다.',
+  bullets:[[0,'의사표시자와 효과 귀속자가 분리 → 대리인은 본인 이익에 맞게 행사해야'],[7,'대리는 본인과 대리인의 신뢰 관계가 바탕'],[13,'대리인 = 단순 전달자 ✗ / 실제 의사표시의 주체 ○'],[20,'대리인의 사적 이익 ↔ 본인의 이익 충돌 가능'],[26,'민법: 본인의 이익을 해치는 대리권 행사를 제한']],
+  steps:[[0,'의사표시는 대리인이 하는데 효과는 본인이 받으니, 대리인은 본인의 이익에 맞는 방향으로 대리권을 써야 해요. 대리는 신뢰 관계를 바탕으로 하거든요.'],
+         [13,'그런데 대리인은 본인의 말을 그대로 옮기는 전달자가 아니라, 스스로 판단해 실제로 의사표시를 하는 주체예요.'],
+         [20,'그래서 대리인의 사적 이익과 본인의 이익이 부딪칠 수 있어요. 민법은 대리인이 본인의 이익을 해치는 방식으로 대리권을 쓰지 못하도록 제한을 둬요.']],
+  draw(ctx,lt){ BG(ctx);
+    who(ctx,600,800,1.25,{color:R.agent,label:'대리인',alpha:1});
+    if(lt<13){ const b=vis(lt,0.3,13); chip(ctx,600,180,'신뢰 관계',R.other,{alpha:b,align:'center',size:32}); flow(ctx,[300,330],[520,620],{color:R.bonin,lt,alpha:b,bend:20,label:'믿고 맡김',size:20}); who(ctx,250,420,1,{color:R.bonin,label:'본인',alpha:b}); }
+    if(lt>13&&lt<20.3){ const b=vis(lt,13.2,20.3);
+      box(ctx,90,200,460,140,{fill:'#131d33',stroke:R.bad,alpha:b}); txt(ctx,'단순 전달자 ✗',320,260,{size:32,weight:900,align:'center',color:R.bad,alpha:b}); txt(ctx,'(본인 말을 그대로 옮기기만?)',320,305,{size:22,align:'center',color:'#fecaca',alpha:b});
+      box(ctx,650,200,460,140,{fill:'#131d33',stroke:R.other,alpha:b}); txt(ctx,'의사표시의 주체 ○',880,260,{size:32,weight:900,align:'center',color:R.other,alpha:b}); txt(ctx,'(스스로 판단하고 결정)',880,305,{size:22,align:'center',color:'#bbf7d0',alpha:b}); }
+    if(lt>20){ const b=fin(lt,20.3,0.6); const t=Math.sin(lt*1.6)*0.12;
+      scale(ctx,600,560,t,b,['본인의 이익','대리인의 사적 이익'],[R.bonin,R.agent]);
+      chip(ctx,600,190,'이익 충돌 가능 → 대리권 행사를 제한',R.bad,{alpha:fin(lt,26,0.6),align:'center',size:28}); }
+  }});
+
+// 6 자기계약 vs 쌍방대리
+SCENES.push({title:'자기계약과 쌍방대리', short:'⑥ 자기계약 · 쌍방대리', dur:50,
+  quote:'자기계약은 대리인이 본인을 대신해 법률행위를 하면서 동시에 그 법률행위의 상대방이 되는 경우이고 쌍방대리는 하나의 법률행위에서 한 명의 대리인이 양측 당사자를 모두 대리하는 경우를 말한다.',
+  bullets:[[0,'자기계약: 대리인 = 그 법률행위의 상대방'],[13,'위험: 대리인이 사적 이익 추구 → 본인 이익 침해'],[22,'쌍방대리: 한 명의 대리인이 양측 당사자를 모두 대리'],[32,'위험: 양측 모두 이익을 충분히 보호받지 못함'],[40,'→ 원칙적으로 금지']],
+  steps:[[0,'자기계약은 대리인이 본인을 대신하면서 동시에 그 계약의 상대방이 되는 경우예요. 예: 삼촌이 지민이의 대리인이면서, 자기 노트북을 지민이에게 파는 계약.'],
+         [13,'이러면 삼촌은 파는 사람으로서 비싸게 팔고 싶어 지겠죠? 대리인이 자기 이익을 좇아 본인의 이익을 해칠 수 있어요.'],
+         [22,'쌍방대리는 한 계약에서 한 명의 대리인이 양쪽 당사자를 모두 대리하는 경우예요. 예: 같은 사람이 파는 사람 쪽과 사는 사람 쪽을 동시에 대리.'],
+         [32,'한 사람이 양쪽 이익을 동시에 지키기는 어려워서, 양측 모두 이익을 충분히 보호받지 못할 위험이 커요.'],
+         [40,'그래서 자기계약과 쌍방대리는 원칙적으로 금지돼요. 기억법: 자기계약은 대리인 ‘자기’가 상대방, 쌍방대리는 ‘쌍방(양쪽)’을 다 대리!']],
+  draw(ctx,lt){ BG(ctx);
+    const L=fin(lt,0.2,0.6), Rt=fin(lt,22,0.6);
+    panelBox(ctx,50,140,540,720,'자기계약',R.agent,L); panelBox(ctx,610,140,540,720,'쌍방대리',R.law,Rt);
+    // 자기계약
+    who(ctx,150,560,0.95,{color:R.bonin,label:'본인(지민)',alpha:L});
+    who(ctx,420,560,1.1,{color:R.agent,label:'삼촌',sub:'대리인 + 상대방',alpha:L,glow:0.4});
+    laptop(ctx,500,420,0.9,L);
+    ctx.save(); ctx.globalAlpha*=L; ctx.setLineDash([8,6]); ctx.strokeStyle=R.agent; ctx.lineWidth=3; rr(ctx,330,300,190,330,24); ctx.stroke(); ctx.restore();
+    txt(ctx,'대리하는 쪽',360,285,{size:20,weight:700,color:R.bonin,alpha:L}); txt(ctx,'파는 쪽',490,285,{size:20,weight:700,color:R.other,alpha:L});
+    if(lt>13){ const b=fin(lt,13.3,0.6); bubble(ctx,90,200,470,'(속으로) “내 노트북이니 비싸게 팔까?”',{think:true,tail:[420,380],alpha:b,size:22}); chip(ctx,320,710,'본인 이익 침해 위험',R.bad,{alpha:b,align:'center'}); }
+    // 쌍방대리
+    who(ctx,720,620,0.9,{color:R.bonin,label:'파는 사람',alpha:Rt}); who(ctx,1040,620,0.9,{color:R.other,label:'사는 사람',alpha:Rt});
+    who(ctx,880,400,1.05,{color:R.agent,label:'한 명의 대리인',alpha:Rt,glow:0.4});
+    flow(ctx,[850,420],[740,520],{color:R.bonin,lt,alpha:Rt,width:4,head:14,dot:false}); flow(ctx,[910,420],[1020,520],{color:R.other,lt,alpha:Rt,width:4,head:14,dot:false});
+    if(lt>32){ const b=fin(lt,32.3,0.6); chip(ctx,880,710,'양측 모두 보호 부족 위험',R.bad,{alpha:b,align:'center'}); }
+    if(lt>40) stamp(ctx,600,790,'원칙적 금지',R.bad,clamp((lt-40.3)/0.6));
+  }});
+
+// 7 예외 허용
+SCENES.push({title:'자기계약 · 쌍방대리가 예외적으로 허용될 때 (㉠)', short:'⑦ 예외 허용 ㉠', dur:44,
+  quote:'다만 ㉠새로운 계약 조건을 정하거나 이해관계를 조정하는 경우가 아닌 기존의 의무를 실현하는 것에 가까울 때에는 자기계약과 쌍방대리가 예외적으로 허용되기도 한다. … 또한 본인이 별도로 허락한 경우에도 예외적으로 자기계약과 쌍방대리는 허용될 수 있다.',
+  bullets:[[0,'금지 유지: 새로운 계약 조건을 정함 · 이해관계를 조정함'],[9,'예외 ①: 기존의 의무를 실현하는 것에 가까울 때'],[13,'예: 이미 정해진 채무를 그대로 갚아 나가는 상황'],[22,'예외 ②: 본인이 별도로 허락한 경우'],[30,'이유: 본인 이익이 침해될 위험이 상대적으로 작음 (20번 ④)'],[37,'함정: “본인에게 이익이 되면 허용” ✗ (지문에 없는 조건)']],
+  steps:[[0,'원칙은 금지지만 예외가 있어요. 먼저, 새로운 계약 조건(가격 등)을 정하거나 이해관계를 조정하는 일이라면 여전히 위험하므로 허용되지 않아요.'],
+         [9,'반면 기존의 의무를 실현하는 것에 가까울 때는 예외적으로 허용될 수 있어요. 예: 이미 정해진 100만 원의 채무를 그대로 갚는 일.'],
+         [17,'이미 금액과 조건이 정해져 있으니 대리인이 마음대로 조건을 바꿔 본인에게 손해를 끼칠 여지가 거의 없죠.'],
+         [22,'또 본인이 별도로 허락한 경우에도 예외적으로 허용될 수 있어요. 본인이 스스로 위험을 알고 받아들인 것이니까요.'],
+         [30,'즉, ㉠의 이유는 ‘본인의 이익이 침해될 위험이 상대적으로 작기 때문’이에요. 20번 정답의 근거예요.'],
+         [37,'주의! “본인에게 이익이 되면 허용된다”는 지문에 없는 조건이에요. 지문의 예외는 ‘기존 의무 실현에 가까움’과 ‘본인의 허락’ 두 가지예요.']],
+  draw(ctx,lt){ BG(ctx);
+    const a=fin(lt,0.2,0.6), b=fin(lt,9,0.6);
+    panelBox(ctx,50,140,540,500,'허용 ✗: 새 조건 · 이해관계 조정',R.bad,a); panelBox(ctx,610,140,540,500,'허용 가능 ○: 기존 의무 실현',R.other,b);
+    doc(ctx,320,330,{title:'새 계약',pre:'',name:'가격: ?  조건: ?',w:220,h:170,alpha:a});
+    txt(ctx,'가격 흥정 · 조건 결정',320,480,{size:24,weight:700,align:'center',color:'#fecaca',alpha:a});
+    const meter=(x,y,v,col,al)=>{ box(ctx,x-170,y,340,26,{fill:'#1f2937',stroke:null,r:13,alpha:al}); box(ctx,x-170,y,340*v,26,{fill:col,stroke:null,r:13,alpha:al}); txt(ctx,'본인 이익 침해 위험',x,y-12,{size:20,align:'center',color:'#cbd5e1',alpha:al}); };
+    meter(320,570,0.9,R.bad,a);
+    doc(ctx,880,330,{title:'이미 정해진 채무',pre:'',name:'100만 원 그대로',w:240,h:170,alpha:b});
+    txt(ctx,'정해진 대로 갚기만 함',880,480,{size:24,weight:700,align:'center',color:'#bbf7d0',alpha:b});
+    meter(880,570,0.18,R.other,b);
+    if(lt>22){ const c=fin(lt,22.3,0.6); box(ctx,610,660,540,90,{fill:'#13311f',stroke:R.other,alpha:c}); txt(ctx,'허용 가능 ○: 본인이 별도로 허락한 경우',880,716,{size:25,weight:900,align:'center',color:'#bbf7d0',alpha:c}); }
+    if(lt>30&&lt<37){ const c=vis(lt,30.2,37); box(ctx,50,660,540,90,{fill:'#3b2a0a',stroke:R.gold,alpha:c}); txt(ctx,'이유: 본인 이익 침해 위험이 작다',320,716,{size:25,weight:900,align:'center',color:R.gold,alpha:c}); }
+    if(lt>37) trap(ctx,50,760,1100,'새 조건을 정하더라도 본인에게 이익이 되면 자기계약이 허용된다','예외 = 기존 의무 실현에 가까울 때 / 본인이 별도로 허락한 경우',fin(lt,37.3,0.6));
+  }});
+
+// 8 보조상 개요
+SCENES.push({title:'(나) 상법의 보조상: 왜 필요할까?', short:'⑧ 보조상', dur:36,
+  quote:'상법에서는 다른 상인의 영업활동을 보조하는 상인인 보조상에 관한 제도를 규정하여 상거래의 경제성과 안전성을 도모한다. … 이들은 모두 독립된 상인이라는 점은 같지만 거래 시 누구의 명의로 행위하는지가 서로 다르다.',
+  bullets:[[0,'영업 확장 · 높은 전문성 → 모든 영업을 직접 하면 비용과 위험 부담'],[9,'보조상: 다른 상인의 영업활동을 보조하는 상인'],[14,'목적: 상거래의 경제성과 안전성'],[19,'대표: 대리상과 위탁매매인 — 모두 “독립된 상인”'],[27,'차이: 거래 시 누구의 명의로 행위하는가']],
+  steps:[[0,'이제 (나)예요. 상인이 영업을 넓히거나 높은 전문성이 필요한 일을 할 때, 모든 일을 직접 하면 비용과 위험 부담이 따를 수 있어요.'],
+         [9,'그래서 상법은 다른 상인의 영업활동을 보조하는 상인, ‘보조상’ 제도를 두어 상거래의 경제성과 안전성을 도모해요.'],
+         [19,'대표적인 보조상은 대리상과 위탁매매인이에요. 둘 다 회사 직원이 아니라 ‘독립된 상인’이라는 점을 꼭 기억하세요.'],
+         [27,'둘의 결정적 차이는 “거래할 때 누구의 명의(이름)로 하느냐”예요. 대리상은 본인 명의, 위탁매매인은 자기 명의!']],
+  draw(ctx,lt){ BG(ctx);
+    shop(ctx,600,470,1.3,{color:'#38bdf8',label:'상인(본인 · 위탁자)'});
+    if(lt<19){ const b=vis(lt,0.5,19); [['영업 확장','#38bdf8',300,230],['높은 전문성','#c084fc',900,230]].forEach(([s,c,x,y])=>chip(ctx,x,y,s,c,{alpha:b,align:'center',size:26}));
+      [['비용 부담',360],['위험 부담',840]].forEach(([s,x],i)=>{ const k=fin(lt,3+i*0.6,0.6)*fout(lt,18.5,0.5); txt(ctx,s,x,620,{size:30,weight:900,align:'center',color:R.bad,alpha:k}); arrow(ctx,x,580,x+(600-x)*0.4,480,{color:R.bad,width:5,alpha:k}); });
+      if(lt>9){ const c=fin(lt,9.3,0.6); chip(ctx,600,700,'보조상 제도 → 경제성 · 안전성',R.other,{alpha:c,align:'center',size:28}); } }
+    if(lt>19){ const c=fin(lt,19.3,0.6);
+      who(ctx,280,780,1.05,{color:R.agent,label:'대리상',alpha:c}); who(ctx,920,780,1.05,{color:R.consign,label:'위탁매매인',alpha:c});
+      chip(ctx,280,570,'독립된 상인',R.other,{alpha:c,align:'center'}); chip(ctx,920,570,'독립된 상인',R.other,{alpha:c,align:'center'});
+      txt(ctx,'직원 ✗',600,640,{size:30,weight:900,align:'center',color:R.bad,alpha:c});
+      if(lt>27){ const d=fin(lt,27.3,0.6); box(ctx,230,170,740,110,{fill:'rgba(15,23,42,.94)',stroke:R.gold,alpha:d}); txt(ctx,'누구의 명의로 거래하나?',600,222,{size:32,weight:900,align:'center',color:R.gold,alpha:d});
+        txt(ctx,'대리상(체약) → 본인 명의   |   위탁매매인 → 자기 명의',600,262,{size:24,weight:700,align:'center',alpha:d}); } }
+  }});
+
+// 9 대리상
+SCENES.push({title:'대리상: 체약대리상과 중개대리상', short:'⑨ 대리상', dur:52,
+  quote:'체약대리상은 다른 상인을 위해 계약을 대신 체결하는 대리상으로, 본인의 명의로써 의사표시를 하고 그 법률효과가 직접 본인에게 귀속된다. … 반면, 중개대리상은 거래를 알선할 뿐 본인을 대신하여 의사표시를 하거나 계약하지 않는다.',
+  bullets:[[0,'대리상: 특정한 상인을 위해 지속적으로 거래의 대리 또는 중개'],[9,'체약대리상: 본인 명의로 의사표시 → 효과가 직접 본인에게'],[17,'본인 = 계약의 당사자'],[23,'중개대리상: 거래를 알선할 뿐, 의사표시·계약 ✗'],[34,'의무 ①: 대리·중개 내용을 지체없이 본인에게 통지'],[40,'의무 ②: 허락 없이 자신·제3자 이익 위해 본인 영업 부류의 거래 ✗']],
+  steps:[[0,'예: 서울의 ‘해솔제과’가 부산으로 사업을 넓히려고, 부산 카페들과 이미 신뢰를 쌓은 상인 갑을 대리상으로 삼아 거래를 지속적으로 맡겨요.'],
+         [9,'체약대리상이라면 갑이 해솔제과의 명의로 카페와 계약을 직접 체결해요. 서명은 갑이 해도, 계약서의 명의는 해솔제과!'],
+         [17,'그래서 법률효과는 곧바로 해솔제과에게 가고, 계약의 당사자도 본인인 해솔제과예요.'],
+         [23,'중개대리상이라면 갑은 카페를 소개하고 거래를 알선할 뿐이에요. 계약은 해솔제과와 카페가 직접 맺고, 갑은 의사표시도 계약도 하지 않아요.'],
+         [34,'대리상의 의무: 거래를 대리하거나 중개했다면 그 내용을 지체없이 본인에게 알려야 해요.'],
+         [40,'또 본인의 허락 없이 자기나 제3자의 이익을 위해 본인의 영업 부류에 속한 거래를 하는 등 신뢰를 해치면 안 돼요. 예: 몰래 경쟁 빵집 제품을 팔기.']],
+  draw(ctx,lt){ BG(ctx);
+    if(lt<9.3){ const b=vis(lt,0.2,9.3); shop(ctx,250,520,1.15,{color:'#38bdf8',label:'해솔제과 (본인)',sub:'서울',alpha:b}); who(ctx,620,560,1.15,{color:R.agent,label:'갑 (대리상)',sub:'부산 · 독립된 상인',alpha:b});
+      [0,1,2].forEach(i=>shop(ctx,950,330+i*200,0.55,{color:R.other,label:i===1?'부산 카페들':null,alpha:b}));
+      flow(ctx,[360,420],[540,420],{color:'#38bdf8',label:'지속적으로 맡김',lt,alpha:b,size:20}); flow(ctx,[700,440],[880,440],{color:R.agent,label:'이미 신뢰',lt,alpha:b,size:20,dot:false}); return; }
+    if(lt<23.3){ const b=vis(lt,9.3,23.3); txt(ctx,'체약대리상',600,180,{size:36,weight:900,align:'center',color:R.agent,alpha:b});
+      shop(ctx,200,520,1,{color:'#38bdf8',label:'해솔제과(본인)',alpha:b}); who(ctx,560,560,1.05,{color:R.agent,label:'갑',alpha:b}); shop(ctx,960,520,1,{color:R.other,label:'카페(상대방)',alpha:b});
+      doc(ctx,760,340,{name:'해솔제과',signer:'갑',alpha:fin(lt,10,0.6),hl:fin(lt,12,0.6)});
+      flow(ctx,[620,470],[880,470],{color:R.agent,label:'본인 명의로 의사표시',lt,alpha:fin(lt,11,0.6),size:20});
+      flow(ctx,[900,700],[260,700],{color:R.gold,label:'법률효과 → 직접 본인',lt,alpha:fin(lt,17,0.6),bend:-40,dash:[12,9]});
+      chip(ctx,600,800,'계약의 당사자 = 해솔제과(본인)',R.bonin,{alpha:fin(lt,18,0.6),align:'center',size:26}); return; }
+    if(lt<34.3){ const b=vis(lt,23.3,34.3); txt(ctx,'중개대리상',600,180,{size:36,weight:900,align:'center',color:R.agent,alpha:b});
+      shop(ctx,220,600,1,{color:'#38bdf8',label:'해솔제과(본인)',alpha:b}); shop(ctx,980,600,1,{color:R.other,label:'카페',alpha:b}); who(ctx,600,400,1,{color:R.agent,label:'갑: 알선만',alpha:b});
+      flow(ctx,[540,330],[300,430],{color:R.agent,lt,alpha:b,dash:[8,8],width:3,head:12,label:'소개',size:18}); flow(ctx,[660,330],[900,430],{color:R.agent,lt,alpha:b,dash:[8,8],width:3,head:12,label:'소개',size:18});
+      flow(ctx,[320,560],[880,560],{color:'#38bdf8',label:'계약은 둘이 직접',lt,alpha:fin(lt,26,0.6)});
+      chip(ctx,600,730,'갑: 의사표시 ✗ · 계약 ✗',R.bad,{alpha:fin(lt,28,0.6),align:'center',size:26}); return; }
+    const c=fin(lt,34.3,0.6);
+    shop(ctx,250,560,1.05,{color:'#38bdf8',label:'해솔제과(본인)',alpha:c}); who(ctx,800,600,1.1,{color:R.agent,label:'갑(대리상)',alpha:c});
+    flow(ctx,[720,470],[350,420],{color:R.agent,label:'✉ 지체없이 통지',lt,alpha:c,bend:30,size:22});
+    if(lt>40){ const d=fin(lt,40.3,0.6); box(ctx,640,170,500,150,{fill:'rgba(69,10,10,.92)',stroke:R.bad,alpha:d});
+      txt(ctx,'금지: 허락 없이 자기·제3자 이익을 위해',890,225,{size:23,weight:900,align:'center',color:'#fecaca',alpha:d}); txt(ctx,'본인의 영업 부류에 속한 거래',890,265,{size:23,weight:900,align:'center',color:'#fecaca',alpha:d});
+      txt(ctx,'예) 몰래 경쟁 빵집 제품 팔기',890,302,{size:20,align:'center',color:'#fca5a5',alpha:d}); chip(ctx,600,780,'신뢰를 해치는 행위 ✗',R.bad,{alpha:d,align:'center',size:26}); }
+  }});
+
+// 10 위탁매매인
+SCENES.push({title:'위탁매매인: 자기 명의 + 타인의 계산', short:'⑩ 위탁매매인', dur:58,
+  quote:'위탁매매인은 자기 명의로써 타인의 계산으로 매매를 하는 독립된 상인이다. 이때 ‘자기 명의로써’라는 것은 위탁매매인이 계약 당사자가 되어 직접 권리와 의무의 주체가 된다는 뜻이고, ‘타인의 계산으로’라는 것은 그 거래의 이익과 손해가 위탁자에게 귀속된다는 뜻이다.',
+  bullets:[[0,'예: 주식을 사려는 개인(위탁자) → 전문가(위탁매매인)에게 위탁'],[8,'자기 명의: 위탁매매인이 계약 당사자, 권리·의무의 주체'],[17,'타인의 계산: 이익과 손해는 위탁자에게'],[27,'의무: 매매 후 지체없이 통지 + 계산서 제출'],[33,'이행담보책임: 상대방이 채무를 안 갚으면 위탁매매인이 갚음'],[43,'지정가격보다 불리 → 차액을 부담해야 결과가 위탁자에게 귀속']],
+  steps:[[0,'예: 민수는 주식을 사고 싶지만 잘 몰라서, 주식 시장에 전문성이 높은 위탁매매인에게 매매를 맡겨요. 민수가 ‘위탁자’예요.'],
+         [8,'‘자기 명의로써’: 매도인과 계약할 때 계약서의 명의는 위탁매매인 자신이에요. 계약 당사자도, 권리와 의무의 주체도 위탁매매인!'],
+         [17,'‘타인의 계산으로’: 하지만 그 거래로 생긴 이익과 손해는 위탁자인 민수에게 가요. 주가가 오르면 민수의 이익, 떨어지면 민수의 손해예요.'],
+         [24,'정리하면 “이름(명의)은 위탁매매인, 주머니(계산)는 위탁자”. 이 둘을 섞으면 22번 ⑤ 같은 함정에 걸려요!'],
+         [27,'손익이 위탁자에게 가니까, 위탁매매인은 매매를 마치면 그 내용을 지체없이 알리고 계산서를 내야 해요.'],
+         [33,'위탁자 보호 장치 ①: 거래 상대방이 채무를 갚지 않으면, 위탁매매인이 위탁자에게 그 채무를 갚을 책임을 져요.'],
+         [43,'위탁자 보호 장치 ②: 민수가 “주당 1만 원 이하로”라고 정했는데 1만 500원에 샀다면, 위탁매매인이 차액 500원을 부담해야만 그 결과가 민수에게 귀속돼요.']],
+  draw(ctx,lt){ BG(ctx);
+    const top=lt<27.3;
+    if(top){ const a=fout(lt,26.7,0.6); ctx.save(); ctx.globalAlpha*=a;
+      who(ctx,170,560,1.1,{color:R.bonin,label:'민수 (위탁자)'}); who(ctx,600,560,1.1,{color:R.consign,label:'위탁매매인'}); who(ctx,1030,560,1.1,{color:R.other,label:'매도인 (상대방)'});
+      flow(ctx,[250,470],[520,470],{color:R.bonin,label:'매매 위탁',lt,size:20});
+      if(lt>8){ const b=fin(lt,8.3,0.6); doc(ctx,815,355,{name:'위탁매매인',signer:'',alpha:b,hl:fin(lt,9,0.6)}); flow(ctx,[680,480],[950,480],{color:R.consign,lt,alpha:b,label:'계약',size:20});
+        chip(ctx,815,180,'자기 명의 → 계약 당사자 · 권리·의무 주체',R.consign,{alpha:fin(lt,10,0.6),align:'center',size:22}); }
+      if(lt>17){ const b=fin(lt,17.3,0.6); const k=(lt*0.5)%1; coin(ctx,lerp(980,220,k),760-Math.sin(k*Math.PI)*60,24,'+',{alpha:b}); coin(ctx,lerp(980,220,(k+0.5)%1),760-Math.sin(((k+0.5)%1)*Math.PI)*60,24,'−',{alpha:b,col:'#fca5a5'});
+        chip(ctx,600,830,'타인의 계산 → 이익 · 손해는 위탁자(민수)에게',R.gold,{alpha:b,align:'center',size:22}); }
+      if(lt>24){ const b=fin(lt,24.2,0.5); box(ctx,180,150,840,90,{fill:'rgba(15,23,42,.95)',stroke:R.gold,alpha:b}); txt(ctx,'이름(명의) = 위탁매매인  /  주머니(계산) = 위탁자',600,207,{size:30,weight:900,align:'center',color:R.gold,alpha:b}); }
+      ctx.restore(); return; }
+    const a=fin(lt,27.3,0.6);
+    panelBox(ctx,50,140,1100,190,'',R.consign,a);
+    txt(ctx,'의무: 매매를 마치면',300,215,{size:28,weight:900,align:'center',color:R.consign,alpha:a}); chip(ctx,560,190,'✉ 지체없이 통지',R.consign,{alpha:a}); chip(ctx,800,190,'🧾 계산서 제출',R.consign,{alpha:a});
+    txt(ctx,'(손익이 위탁자에게 가기 때문)',600,295,{size:22,align:'center',color:'#cbd5e1',alpha:a});
+    if(lt>33&&lt<43.3){ const b=vis(lt,33.2,43.3); panelBox(ctx,50,350,1100,500,'이행담보책임',R.other,b);
+      who(ctx,200,760,0.9,{color:R.bonin,label:'민수',alpha:b}); who(ctx,600,760,0.9,{color:R.consign,label:'위탁매매인',alpha:b}); who(ctx,1000,760,0.9,{color:R.other,label:'상대방',alpha:b});
+      txt(ctx,'채무를 안 갚음 ✗',1000,500,{size:26,weight:900,align:'center',color:R.bad,alpha:b});
+      flow(ctx,[540,560],[260,560],{color:R.other,label:'위탁매매인이 대신 갚을 책임',lt,alpha:fin(lt,35,0.6),size:22}); }
+    if(lt>43){ const b=fin(lt,43.3,0.6); panelBox(ctx,50,350,1100,500,'지정가격보다 불리한 거래',R.gold,b);
+      txt(ctx,'민수의 지정: 주당 10,000원 이하',600,450,{size:28,weight:900,align:'center',alpha:b});
+      box(ctx,200,500,800,70,{fill:'#1f2937',stroke:null,r:12,alpha:b}); box(ctx,200,500,640,70,{fill:'#1d4ed8',stroke:null,r:12,alpha:b}); box(ctx,840,500,64,70,{fill:R.bad,stroke:null,r:0,alpha:b*fin(lt,45,0.5)});
+      txt(ctx,'10,000원',520,545,{size:26,weight:900,align:'center',color:'#fff',alpha:b}); txt(ctx,'+500',872,545,{size:22,weight:900,align:'center',color:'#fff',alpha:b*fin(lt,45,0.5)});
+      txt(ctx,'실제 매수가 10,500원',600,610,{size:24,align:'center',color:'#fecaca',alpha:fin(lt,45,0.5)});
+      chip(ctx,600,660,'차액 500원을 위탁매매인이 부담해야 → 결과가 민수에게 귀속',R.gold,{alpha:fin(lt,47,0.6),align:'center',size:24});
+      txt(ctx,'(숫자는 이해를 돕기 위한 예시)',600,780,{size:19,align:'center',color:'#94a3b8',alpha:b}); }
+  }});
+
+// 11 권리
+SCENES.push({title:'보조상의 권리: 유치권 · 보상청구권 · 개입권', short:'⑪ 보조상의 권리', dur:54,
+  quote:'상법은 본인이나 위탁자의 이익뿐 아니라 보조상의 영업활동을 보호하기 위하여도 다양한 권리를 인정한다.',
+  bullets:[[0,'이 권리들은 “보조상의 영업활동을 보호”하기 위한 것'],[6,'유치권(대리상 · 위탁매매인 모두): 수수료·비용을 못 받으면 물건을 돌려주지 않을 수 있음'],[18,'보상청구권(대리상): 계약 종료 후에도 본인이 대리상 덕분에 이익 → 일정 기간 내 보상 청구'],[31,'개입권(위탁매매인): 객관적 거래소 시세가 있는 물건·유가증권 → 직접 상대방이 될 수 있음'],[39,'개입권을 행사해도 보수 청구 가능'],[45,'함정: 개입권 = 위탁자 보호 방안 ✗ (21번 ④)']],
+  steps:[[0,'상법은 본인이나 위탁자만이 아니라, 보조상의 영업활동을 보호하기 위해서도 권리를 줘요. 세 가지를 누구에게 주는지 정확히 짝지어 봅시다.'],
+         [6,'유치권: 받아야 할 수수료나 비용을 때가 지났는데도 못 받았다면, 본인이나 위탁자를 위해 갖고 있던 물건을 돌려주지 않을 수 있어요. 대리상과 위탁매매인 모두에게 있어요.'],
+         [18,'보상청구권: 갑의 활동으로 해솔제과의 거래가 늘었고, 갑과의 계약이 끝난 뒤에도 해솔제과가 그 덕분에 이익을 얻고 있다면, 갑은 일정 기간 안에 보상을 청구할 수 있어요. 대리상의 권리예요.'],
+         [31,'개입권: 객관적인 거래소 시세가 있는 물건이나 유가증권이라면, 위탁매매인이 직접 그 거래의 상대방이 될 수 있어요. 위탁매매인의 권리예요.'],
+         [39,'개입권을 행사한 경우에도 위탁매매인은 위탁자에게 보수를 청구할 수 있어요.'],
+         [45,'함정 주의! 개입권은 지문에서 ‘보조상의 영업활동을 보호’하는 권리로 소개돼요. “위탁자의 이익을 보호하는 방안”으로 쓴 21번 ④가 적절하지 않은 이유예요.']],
+  draw(ctx,lt){ BG(ctx);
+    const rows=[['유치권','○','○',6],['보상청구권','○','✗',18],['개입권','✗','○',31]];
+    const x0=80, y0=160, cw=[260,200,240];
+    box(ctx,x0,y0,700,64,{fill:'#1e293b',stroke:null,r:10}); txt(ctx,'권리',x0+130,y0+42,{size:26,weight:900,align:'center'}); txt(ctx,'대리상',x0+360,y0+42,{size:26,weight:900,align:'center',color:R.agent}); txt(ctx,'위탁매매인',x0+580,y0+42,{size:26,weight:900,align:'center',color:R.consign});
+    rows.forEach(([n,a,b,t],i)=>{ const k=fin(lt,t,0.6), y=y0+76+i*76; box(ctx,x0,y,700,66,{fill:sub2(lt,t,i===2?45:rows[i+1][3])?'#1d3557':'#131d33',stroke:C.line,r:10,alpha:k});
+      txt(ctx,n,x0+130,y+44,{size:28,weight:900,align:'center',alpha:k}); txt(ctx,a,x0+360,y+46,{size:34,weight:900,align:'center',color:a==='○'?R.other:R.bad,alpha:k}); txt(ctx,b,x0+580,y+46,{size:34,weight:900,align:'center',color:b==='○'?R.other:R.bad,alpha:k}); });
+    chip(ctx,800,175,'목적: 보조상의 영업활동 보호','#38bdf8',{alpha:fin(lt,1,0.6),size:22});
+    const yA=440;
+    if(lt>6&&lt<18.3){ const b=vis(lt,6.2,18.3); who(ctx,300,820,1,{color:R.consign,label:'보조상',alpha:b}); shop(ctx,880,820,0.9,{color:'#38bdf8',label:'본인 · 위탁자',alpha:b});
+      ctx.save(); ctx.globalAlpha*=b; ctx.fillStyle='#a16207'; rr(ctx,380,690,110,90,8); ctx.fill(); ctx.strokeStyle='#713f12'; ctx.lineWidth=3; ctx.strokeRect(380,690,110,90); ctx.beginPath(); ctx.moveTo(380,735); ctx.lineTo(490,735); ctx.stroke(); ctx.restore();
+      txt(ctx,'맡아 둔 물건',435,680,{size:20,weight:700,align:'center',color:'#fde68a',alpha:b});
+      bubble(ctx,140,yA+30,480,'“수수료를 받을 때가 지났는데 못 받았으니, 받을 때까지 물건은 돌려드리지 않을게요.”',{tail:[320,640],alpha:b,size:22});
+      flow(ctx,[780,700],[520,700],{color:R.bad,label:'수수료 미지급',lt,alpha:b,dash:[8,8],size:20,dot:false}); }
+    if(lt>18&&lt<31.3){ const b=vis(lt,18.2,31.3); const X=(v)=>140+v*900;
+      ctx.save(); ctx.globalAlpha*=b; ctx.strokeStyle='#cbd5e1'; ctx.lineWidth=4; ctx.beginPath(); ctx.moveTo(X(0),660); ctx.lineTo(X(1),660); ctx.stroke(); ctx.restore();
+      [[0.05,'갑이 대리상으로 활동','#fbbf24'],[0.38,'거래 증가','#4ade80'],[0.6,'대리상 계약 종료','#f87171'],[0.85,'그래도 본인은 이익','#4ade80']].forEach(([v,s,c],i)=>{ const k=b*fin(lt,19+i*1.4,0.5); ctx.save(); ctx.globalAlpha*=k; ctx.beginPath(); ctx.arc(X(v),660,12,0,Math.PI*2); ctx.fillStyle=c; ctx.fill(); ctx.restore(); txt(ctx,s,X(v),i%2?720:625,{size:22,weight:700,align:'center',color:c,alpha:k}); });
+      box(ctx,X(0.6),760,X(0.95)-X(0.6),40,{fill:'rgba(251,191,36,.25)',stroke:R.agent,r:8,alpha:b*fin(lt,25,0.6)}); txt(ctx,'일정 기간 내 보상 청구',(X(0.6)+X(0.95))/2,787,{size:20,weight:900,align:'center',color:R.agent,alpha:b*fin(lt,25,0.6)});
+      txt(ctx,'보상청구권 = 대리상만!',600,yA+40,{size:30,weight:900,align:'center',color:R.agent,alpha:b}); }
+    if(lt>31){ const b=fin(lt,31.3,0.6); box(ctx,90,yA+10,330,170,{fill:'#052e16',stroke:R.other,alpha:b}); txt(ctx,'거래소 시세',255,yA+50,{size:24,weight:900,align:'center',color:R.other,alpha:b});
+      ctx.save(); ctx.globalAlpha*=b; ctx.strokeStyle=R.other; ctx.lineWidth=4; ctx.beginPath(); for(let k=0;k<=12;k++){ const x=110+k*24, y=yA+140-Math.sin(k*0.9+lt)*18-k*3; k?ctx.lineTo(x,y):ctx.moveTo(x,y);} ctx.stroke(); ctx.restore();
+      txt(ctx,'객관적 시세가 있는 물건 · 유가증권',255,yA+210,{size:19,align:'center',color:'#bbf7d0',alpha:b});
+      who(ctx,560,820,0.95,{color:R.bonin,label:'위탁자',alpha:b}); who(ctx,900,820,0.95,{color:R.consign,label:'위탁매매인',sub:'= 직접 상대방',alpha:b,glow:0.4});
+      flow(ctx,[620,700],[840,700],{color:R.consign,label:'직접 거래',lt,alpha:b,size:20});
+      if(lt>39) chip(ctx,730,yA+30,'개입권 행사해도 보수 청구 ○',R.gold,{alpha:fin(lt,39.3,0.6),align:'center',size:22});
+      if(lt>45) trap(ctx,440,yA+80,700,'개입권은 위탁자 이익 보호 방안','개입권은 보조상(위탁매매인)의 권리',fin(lt,45.3,0.6)); }
+  }});
+
+// 12 보기 사례 적용
+SCENES.push({title:'사례에 적용하기: 22번 <보기>', short:'⑫ 사례 적용', dur:52,
+  quote:'갑은 새로운 거래처인 을에게 매매 계약이 A를 위한 것임을 밝혔다. … 갑은 A의 명의로써, 을은 자기 명의로써 계약을 체결했다. 갑의 활동으로 A와 을의 거래량이 증가했고, 5년 뒤 A와 갑의 계약 종료 후에도 A는 을과의 거래로 계속 이익을 얻었다.',
+  bullets:[[0,'A가 갑에게 5년간 구리 매매 계약 체결을 맡김 → 갑 = A의 체약대리상'],[9,'B가 을에게 구리 확보를 의뢰 → 을 = B의 위탁매매인'],[17,'갑: A를 위한 것임을 밝힘(현명) · A의 명의'],[25,'을: 자기 명의 · B의 계산 → 이익은 B에게'],[35,'계약 종료 후에도 A가 이익 → 갑의 보상청구권'],[43,'⑤ “이익은 B가 아니라 을에게” ✗ → 22번 정답']],
+  steps:[[0,'금속 도매업체 A는 금속 판매점 운영자 갑에게 5년간 구리 매매 계약을 대신 체결하는 일을 맡겼어요. 지속적으로 계약을 대신 체결하니 갑은 A의 ‘체약대리상’이에요.'],
+         [9,'제조업체 B는 원자재 매입 전문 상인 을에게 구리 10톤을 톤당 1,500만 원 이하로 확보해 달라고 의뢰했어요. 자기 명의로 B를 위해 사니까 을은 B의 ‘위탁매매인’이에요.'],
+         [17,'갑은 을에게 이 계약이 A를 위한 것임을 밝혔어요(현명). 그래서 을은 법률효과가 A에게 귀속된다는 것을 알 수 있어요. 갑은 A의 명의로 계약해요.'],
+         [25,'을은 자기 명의로 계약했지만 B의 계산으로 한 거래예요. 톤당 1,480만 원은 지정한 1,500만 원 이하이니 문제없고, 이익은 B에게 귀속돼요.'],
+         [35,'갑의 활동으로 A와 을의 거래가 늘었고, A와 갑의 계약이 끝난 뒤에도 A는 계속 이익을 얻었어요. 그러니 갑은 일정 기간 내에 보상을 청구할 수 있어요.'],
+         [43,'따라서 “매매 거래에서 발생한 이익은 B가 아니라 을에게 귀속된다”는 ⑤가 틀렸어요. 을은 이름(명의)만 자기 것이고, 주머니(계산)는 B예요!']],
+  draw(ctx,lt){ BG(ctx);
+    shop(ctx,180,420,0.95,{color:'#38bdf8',label:'A (금속 도매업체)',sub:'본인'}); who(ctx,470,440,1,{color:R.agent,label:'갑',sub:'체약대리상',alpha:fin(lt,1,0.6)});
+    shop(ctx,1020,420,0.95,{color:'#c084fc',label:'B (제조업체)',sub:'위탁자',alpha:fin(lt,9,0.6)}); who(ctx,740,440,1,{color:R.consign,label:'을',sub:'위탁매매인',alpha:fin(lt,9,0.6)});
+    flow(ctx,[260,300],[420,300],{color:'#38bdf8',label:'5년간 계약 체결 위임',lt,alpha:fin(lt,2,0.6),size:18});
+    flow(ctx,[940,300],[800,300],{color:'#c084fc',label:'톤당 1,500만 원 이하',lt,alpha:fin(lt,10,0.6),size:18});
+    if(lt>17){ const b=fin(lt,17.3,0.6); flow(ctx,[530,400],[680,400],{color:R.agent,label:'“A를 위한 것” (현명)',lt,alpha:b,size:18,bend:-30});
+      doc(ctx,600,700,{title:'구리 매매 계약',name:'A  ↔  을',signer:'갑(A 대리) · 을',w:300,h:180,alpha:fin(lt,19,0.6),hl:fin(lt,20,0.6)}); txt(ctx,'톤당 1,480만 원',600,822,{size:22,weight:900,align:'center',color:R.gold,alpha:fin(lt,26,0.6)}); }
+    if(lt>25){ const b=fin(lt,25.3,0.6); const k=(lt*0.45)%1; coin(ctx,lerp(760,1000,k),560-Math.sin(k*Math.PI)*50,22,'+',{alpha:b}); chip(ctx,1000,640,'이익 → B',R.gold,{alpha:b,align:'center'}); }
+    if(lt>35){ const b=fin(lt,35.3,0.6); flow(ctx,[480,600],[200,600],{color:R.agent,label:'계약 종료 후 보상 청구',lt,alpha:b,size:18,bend:-30}); }
+    if(lt>43){ const b=fin(lt,43.3,0.6); box(ctx,170,150,860,90,{fill:'rgba(69,10,10,.95)',stroke:R.bad,alpha:b}); txt(ctx,'⑤ 이익은 B가 아니라 을에게 ✗  →  이익은 B(위탁자)에게 ○',600,207,{size:26,weight:900,align:'center',color:'#fecaca',alpha:b}); }
+  }});
+
+// 13 SUMMARY
+SCENES.push({title:'한눈에 비교 · 문항 연결', short:'⑬ 총정리', dur:46, full:true,
+  steps:[[0,'네 가지를 한 표로 비교해 봐요. 특히 “누가 의사표시를 하나, 누구 명의인가, 계약 당사자는 누구인가, 효과·손익은 누구에게 가나”를 구분하세요.'],
+         [22,'문항 연결: 18~23번의 정답과 근거예요. 아래 ‘헷갈림 교정 훈련’에서 직접 풀며 확인해 보세요.']],
+  draw(ctx,lt){
+    if(lt<22.3){ const a=fout(lt,21.7,0.6);
+      const cols=['','민법의 대리','체약대리상','중개대리상','위탁매매인'], colC=['#fff',R.agent,R.agent,'#fde68a',R.consign];
+      const rows=[['의사표시(계약)하는 사람','대리인','대리상','하지 않음 (알선만)','위탁매매인'],['누구의 명의로?','본인 (현명)','본인','—','자기(위탁매매인)'],['계약 당사자','본인','본인','본인 (직접 계약)','위탁매매인'],['효과 · 손익 귀속','본인','본인','본인','위탁자']];
+      const x0=90, w0=360, w=345, y0=170;
+      cols.forEach((c,i)=>{ if(!i) return; const x=x0+w0+(i-1)*w; box(ctx,x+4,y0,w-8,70,{fill:'#1e293b',stroke:colC[i],r:12,alpha:a}); txt(ctx,c,x+w/2,y0+46,{size:28,weight:900,align:'center',color:colC[i],alpha:a}); });
+      rows.forEach((r,j)=>{ const y=y0+90+j*120, k=a*fin(lt,1+j*1.6,0.6); box(ctx,x0,y,w0-8,104,{fill:'#131d33',stroke:C.line,r:12,alpha:k}); txt(ctx,r[0],x0+20,y+62,{size:26,weight:900,alpha:k});
+        r.slice(1).forEach((v,i)=>{ const x=x0+w0+i*w; const hot=(j===1&&i===3)||(j===2&&i===3)||(j===3&&i===3); box(ctx,x+4,y,w-8,104,{fill:hot?'#3b2208':'#131d33',stroke:hot?R.consign:C.line,r:12,alpha:k}); txt(ctx,v,x+w/2,y+62,{size:25,weight:700,align:'center',alpha:k,color:hot?'#fed7aa':'#e5e7eb'}); }); });
+      txt(ctx,'주황 칸: 위탁매매인은 “명의·당사자”와 “손익 귀속”이 서로 다른 사람!',W/2,800,{size:26,weight:900,align:'center',color:R.consign,alpha:a*fin(lt,9,0.6)});
+      return; }
+    const a=fin(lt,22.3,0.6);
+    txt(ctx,'문항 연결 포인트 (정답과 근거)',W/2,180,{size:40,weight:900,align:'center',alpha:a});
+    const cards=[['18번','④','(가)와 (나) 모두 대리·보조상 제도와 관련된 다양한 용어의 개념을 제시'],['19번','②','임의대리는 본인의 수권행위로 대리권 발생 (법률 규정 → 법정대리)'],['20번','④','기존 의무 실현에 가까우면 본인 이익 침해 위험이 상대적으로 작음'],
+                 ['21번','④','개입권은 보조상(위탁매매인)의 권리 → 위탁자 보호 방안 ✗'],['22번','⑤','을은 자기 명의지만 B의 계산 → 이익은 B에게 귀속'],['23번','①','ⓐ ‘따르다’ = 어떤 일이 다른 일과 더불어 일어나다 (어려움이 따르다)']];
+    cards.forEach(([q,ans,why],i)=>{ const b=a*fin(lt,22.6+i*1.2,0.6), x=90+(i%3)*590, y=230+Math.floor(i/3)*300;
+      box(ctx,x,y,560,270,{fill:'#131d33',stroke:C.line,alpha:b}); txt(ctx,q,x+30,y+60,{size:38,weight:900,color:'#38bdf8',alpha:b}); txt(ctx,'정답 '+ans,x+160,y+60,{size:34,weight:900,color:R.gold,alpha:b});
+      ctx.save(); ctx.globalAlpha*=b; para(ctx,why,x+30,y+100,500,{size:26,color:'#e5e7eb'}); ctx.restore(); });
+  }});
+
+/* ================= FRAME ================= */
+const STARTS=[]; let TOTAL=0; for(const s of SCENES){STARTS.push(TOTAL); TOTAL+=s.dur;}
+function sceneAt(T){ let i=SCENES.length-1; for(let k=0;k<SCENES.length;k++){ if(T<STARTS[k]+SCENES[k].dur){i=k;break;} } return [i,T-STARTS[i]]; }
+
+function drawPanel(ctx,s,lt){
+  const x=1190,y=130,w=690,h=770;
+  box(ctx,x,y,w,h,{fill:C.panel,stroke:C.line,r:18});
+  txt(ctx,'지문 속 근거',x+30,y+50,{size:24,weight:700,color:C.accent});
+  ctx.save(); ctx.font=font(23,400);
+  const qh=para(ctx,s.quote.startsWith('“')?s.quote:'“'+s.quote+'”',x+30,y+70,w-60,{size:23,lh:1.55,color:'#cbd5e1'});
+  ctx.restore();
+  let yy=y+70+qh+30;
+  ctx.strokeStyle=C.line; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(x+30,yy-12); ctx.lineTo(x+w-30,yy-12); ctx.stroke();
+  txt(ctx,'핵심 정리',x+30,yy+28,{size:24,weight:700,color:C.gold});
+  yy+=50;
+  for(const [t,b] of s.bullets){
+    const a=fin(lt,t,0.7); if(a<=0) continue;
+    const cur=lt>=t && (s.bullets.find(([t2])=>t2>t)?.[0]??1e9)>lt;
+    ctx.save(); ctx.globalAlpha*=a;
+    if(cur){box(ctx,x+18,yy-6,w-36,0+measureLines(ctx,b,w-90,25)*25*1.45+12,{fill:'rgba(56,189,248,.12)',stroke:null,r:10});}
+    ctx.beginPath(); ctx.arc(x+40,yy+17,6,0,Math.PI*2); ctx.fillStyle=cur?C.accent:'#64748b'; ctx.fill();
+    const hgt=para(ctx,b,x+60,yy,w-90,{size:25,lh:1.45,weight:cur?700:400,color:cur?'#fff':'#cbd5e1'});
+    ctx.restore();
+    yy+=hgt+14;
+  }
+}
+function measureLines(ctx,s,maxW,size){ctx.save(); ctx.font=font(size,700); const n=wrap(ctx,s,maxW).length; ctx.restore(); return n;}
+
+function renderAt(T){
+  const ctx=document.getElementById('cv').getContext('2d');
+  T=clamp(T,0,TOTAL-0.001);
+  const [i,lt]=sceneAt(T); const s=SCENES[i];
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.globalAlpha=1;
+  ctx.fillStyle=C.bg; ctx.fillRect(0,0,W,H);
+  const bgG=ctx.createRadialGradient(600,500,100,600,500,1100); bgG.addColorStop(0,'#101a30'); bgG.addColorStop(1,'#0a101d'); ctx.fillStyle=bgG; ctx.fillRect(0,0,W,H);
+  // header
+  if(i>0) badge(ctx,80,62,String(i),'#0ea5e9',{r:32,size:32});
+  txt(ctx,s.title,i>0?130:60,78,{size:42,weight:900});
+  txt(ctx,HEADER_TAG,1880,74,{size:20,align:'right',color:C.sub});
+  ctx.strokeStyle=C.line; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(40,112); ctx.lineTo(1880,112); ctx.stroke();
+  // scene body
+  ctx.save();
+  const sceneFade=fin(lt,0,0.6)*fout(lt,s.dur-0.45,0.45);
+  ctx.globalAlpha=sceneFade;
+  ctx.beginPath(); s.full?ctx.rect(0,114,W,800):ctx.rect(30,120,1140,790); ctx.clip();
+  s.draw(ctx,lt);
+  ctx.restore();
+  if(!s.full){ ctx.save(); ctx.globalAlpha=sceneFade; drawPanel(ctx,s,lt); ctx.restore(); }
+  // caption
+  let cap=s.steps[0], ci=0; s.steps.forEach((st,k)=>{if(lt>=st[0]){cap=st;ci=k;}});
+  box(ctx,40,920,1840,120,{fill:'rgba(15,23,42,.95)',stroke:C.line,r:16});
+  const ca=fin(lt,cap[0],0.5)*sceneFade;
+  ctx.save(); ctx.font=font(33,500); const lines=wrap(ctx,cap[1],1760); ctx.restore();
+  const lh=46, y0=980-(lines.length-1)*lh/2;
+  lines.forEach((l,k)=>txt(ctx,l,W/2,y0+k*lh+12,{size:33,weight:500,align:'center',alpha:ca}));
+  // progress
+  const px=40,pw=1840,py=1056;
+  SCENES.forEach((sc,k)=>{const x=px+pw*STARTS[k]/TOTAL, w=pw*sc.dur/TOTAL-4; box(ctx,x,py,w,10,{fill:'#1f2937',stroke:null,r:5});
+    const f=clamp((T-STARTS[k])/sc.dur); if(f>0) box(ctx,x,py,Math.max(6,w*f),10,{fill:k===i?C.accent:'#2f6f8f',stroke:null,r:5});});
+}
+
+/* ================= PLAYER ================= */
+const isRender=/[?&]render/.test(location.search);
+window.renderAt=renderAt; window.TOTAL=TOTAL; window.STARTS=STARTS;
+if(isRender){ document.documentElement.classList.add('render'); }
+else {
+  let T=0, playing=false, last=null;
+  const btn=document.getElementById('play'), seek=document.getElementById('seek'), time=document.getElementById('time'), chips=document.getElementById('chips');
+  const fmt=s=>Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0');
+  SCENES.forEach((s,k)=>{const b=document.createElement('button'); b.textContent=s.short; b.onclick=()=>{T=STARTS[k]+0.01; draw();}; chips.appendChild(b);});
+  function draw(){ renderAt(T); seek.value=Math.round(T/TOTAL*1000); time.textContent=fmt(T)+' / '+fmt(TOTAL);
+    const [i]=sceneAt(T); [...chips.children].forEach((c,k)=>c.classList.toggle('on',k===i)); }
+  function loop(ts){ if(playing){ if(last!=null) T+= (ts-last)/1000; last=ts; if(T>=TOTAL){T=TOTAL-0.01; setPlay(false);} draw(); requestAnimationFrame(loop);} }
+  function setPlay(p){ playing=p; btn.textContent=p?'⏸ 일시정지':'▶ 재생'; last=null; if(p){ if(T>=TOTAL-0.05) T=0; requestAnimationFrame(loop);} }
+  btn.onclick=()=>setPlay(!playing);
+  seek.oninput=()=>{T=seek.value/1000*TOTAL; draw();};
+  document.getElementById('prev').onclick=()=>{const [i,lt]=sceneAt(T); T=STARTS[Math.max(0,lt<1.5?i-1:i)]+0.01; draw();};
+  document.getElementById('next').onclick=()=>{const [i]=sceneAt(T); T=STARTS[Math.min(SCENES.length-1,i+1)]+0.01; draw();};
+  addEventListener('keydown',e=>{ if(e.target.closest&&e.target.closest('#drill')) return; if(e.code==='Space'){e.preventDefault(); setPlay(!playing);} if(e.code==='ArrowRight'){T=Math.min(TOTAL-0.01,T+5); draw();} if(e.code==='ArrowLeft'){T=Math.max(0,T-5); draw();} });
+  (document.fonts?document.fonts.load('700 30px "Noto Sans KR"').catch(()=>{}):Promise.resolve()).then(()=>draw());
+  draw();
+}
+</script>
+</body>
+</html>
